@@ -1,0 +1,18 @@
+[package]
+name = "rustdemo"
+version = "0.1.0"
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+uuid = { version = "0.8.2", features = ["serde", "v4"] }
+chrono = {version="0.4",features = ["serde"]}
+tokio = { version = "1.2", features = ["full"] }
+futures = "0.3.16"
+serde="1.0.129"
+serde_json = "1.0.66"
+actix-web = "4.0.0-beta"
+cdrs-tokio = "5.0.0"
+cdrs-tokio-helpers-derive = "3.1.0"
+maplit = "1.0.2"
