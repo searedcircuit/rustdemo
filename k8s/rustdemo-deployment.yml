@@ -1,0 +1,41 @@
+apiVersion: apps/v1 
+kind: Deployment                                  # Type of the kubernetes resource
+metadata:
+  name: rustdemo-app                    				  # Name of the Kubernetes resource
+  namespace: rustdemo
+  labels:
+    app: rustdemo-app
+spec:
+  replicas: 3                                     # Number of pods to run at any given time
+  selector:
+    matchLabels: 
+      app: rustdemo-app                 				  # This deployment applies to any Pods matching the specified label
+  template:                                       # This deployment will create a set of pods using the configurations in this template
+    metadata:
+      labels:                                     # The labels that will be applied to all of the pods in this deployment
+        app: rustdemo-app
+    spec:                                         # Spec for the container which will run in the Pod
+      containers:
+      - name: rustdemo-app 
+        image: ghcr.io/searedcircuit/rustdemo:latest       # The image we are getting from dockerhub
+        ports:
+          - name: http
+            containerPort: 8080                   # Should match the port number that the Go application listens on
+      imagePullSecrets:
+        - name: ghcr-rustdemo-secret
+---
+apiVersion: v1  
+kind: Service                                 # Type of the kubernetes resource
+metadata:
+  name: rustdemo-svc               				  # Name of the Kubernetes resource
+  namespace: rustdemo
+  labels:                                     # Labels that will be applied to the resource
+    app: rustdemo-svc
+spec:
+  type: NodePort                              # Gives each node an external IP that’s accessible from outside the cluster and also opens a Port.
+  selector:
+    app: rustdemo               				  # Selects any Pod with labels `app=authsvc`
+  ports: 
+  - name: http
+    port: 8080
+    targetPort: 8080
