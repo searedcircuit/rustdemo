@@ -21,7 +21,7 @@ const PASSWORD: &str = "password";
 
 pub async fn create_session() -> Session<RoundRobin<TcpConnectionPool>> {
     let auth:StaticPasswordAuthenticatorProvider = StaticPasswordAuthenticatorProvider::new(&USER, &PASSWORD);
-    let node:NodeTcpConfig = NodeTcpConfigBuilder::new("cassandra:9042", Arc::new(auth)).build();
+    let node:NodeTcpConfig = NodeTcpConfigBuilder::new("cassandra.rustdemo:9042", Arc::new(auth)).build();
     let cluster_config:ClusterTcpConfig = ClusterTcpConfig(vec![node]);
     new_session(
         &cluster_config,

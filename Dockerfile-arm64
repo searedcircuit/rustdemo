@@ -1,4 +1,5 @@
-FROM rust:1.54 as build
+FROM arm64v8/rust as builddeps
+
 RUN rustup target add aarch64-unknown-linux-gnu
 
 # create a new empty shell project
@@ -21,7 +22,7 @@ RUN rm ./target/release/deps/rustdemo*
 RUN cargo build --release --target aarch64-unknown-linux-gnu
 
 # our final base
-FROM debian:buster-slim
+FROM arm64v8/debian:buster-slim
 
 # copy the build artifact from the build stage
 COPY --from=build /rustdemo/target/aarch64-unknown-linux-gnu/release/rustdemo .
