@@ -10,7 +10,7 @@ COPY ./Cargo.lock ./Cargo.lock
 COPY ./Cargo.toml ./Cargo.toml
 
 # this build step will cache your dependencies
-RUN cargo build --release --target aarch64-unknown-linux-gnu
+RUN cargo build --release
 RUN rm src/*.rs
 
 # copy your source tree
