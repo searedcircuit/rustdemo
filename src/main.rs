@@ -29,7 +29,7 @@ async fn main() -> std::io::Result<()> {
     db_ops::create_all(&pool.clone()).await;
     println!("db connect complete");
     HttpServer::new(move|| App::new().service(index).app_data(web::Data::new(pool.clone())))
-        .bind("0.0.0.0:8081")?
+        .bind("0.0.0.0:8080")?
         .run()
         .await
 }
