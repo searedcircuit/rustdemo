@@ -21,7 +21,7 @@ type CurrentSession = Session<RoundRobin<ConnectionPool<TransportTcp>>>;
 
 const USER:&str = "user";
 const PASSWORD: &str = "password";
-const ADDRESS: &str = "localhost:9042";
+const ADDRESS: &str = "cassandra:9042";
 
 pub async fn create_session() -> Arc<CurrentSession> {
     let auth:StaticPasswordAuthenticatorProvider = StaticPasswordAuthenticatorProvider::new(&USER, &PASSWORD);    
