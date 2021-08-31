@@ -97,11 +97,18 @@ async fn create_keyspace(session: &Arc<CurrentSession>) {
 async fn create_table(session: &Arc<CurrentSession>) {
     //"CREATE TABLE IF NOT EXISTS user_data.user_credentials ( userid UUID PRIMARY KEY, password text, email text)
     let create_table_cql =
-        "CREATE OR ALTER TABLE user_data.user_credentials ( userid UUID PRIMARY KEY, password text, email text)
-            WITH comment = 'user creds'
-            AND compaction = { 'class': 'LeveledCompactionStrategy', 'sstable_size_in_mb' : 512 }
-            AND compression = { 'class': 'LZ4Compressor', 'chunk_length_kb' : 16 }
+        "ALTER TABLE user_data.user_credentials
+            WITH bloom_filter_fp_chance = 0.01
+            AND caching = {'keys': 'NONE', 'rows_per_partition': '100'}
+            AND comment = ''
+            AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32', 'min_threshold': '4'}
+            AND compression = {'chunk_length_in_kb': '64', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+            AND crc_check_chance = 1.0
             AND default_time_to_live = 0
+            AND gc_grace_seconds = 864000
+            AND max_index_interval = 2048
+            AND memtable_flush_period_in_ms = 0
+            AND min_index_interval = 128
             AND speculative_retry = '99percentile'";
     session
         .query(create_table_cql)
@@ -112,11 +119,18 @@ async fn create_table(session: &Arc<CurrentSession>) {
 async fn create_table2(session: &Arc<CurrentSession>) {
     // "CREATE TABLE IF NOT EXISTS user_data.user_info ( userid UUID PRIMARY KEY, lastname text, firstname text, email text, created_date timestamp, modified_date timestamp, active boolean)
     let create_table_cql =
-        "CREATE OR ALTER TABLE user_data.user_info ( userid UUID PRIMARY KEY, lastname text, firstname text, email text, created_date timestamp, modified_date timestamp, active boolean)
-            WITH comment = 'user info'
-            AND compaction = { 'class': 'LeveledCompactionStrategy', 'sstable_size_in_mb' : 512 }
-            AND compression = { 'class': 'LZ4Compressor', 'chunk_length_kb' : 16 }
+        "ALTER TABLE user_data.user_info        
+            WITH bloom_filter_fp_chance = 0.01
+            AND caching = {'keys': 'NONE', 'rows_per_partition': '100'}
+            AND comment = ''
+            AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32', 'min_threshold': '4'}
+            AND compression = {'chunk_length_in_kb': '64', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+            AND crc_check_chance = 1.0            
             AND default_time_to_live = 0
+            AND gc_grace_seconds = 864000
+            AND max_index_interval = 2048
+            AND memtable_flush_period_in_ms = 0
+            AND min_index_interval = 128
             AND speculative_retry = '99percentile'";
     session
         .query(create_table_cql)
