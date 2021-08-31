@@ -1,38 +1,50 @@
+use cdrs_tokio::cluster::ConnectionPool;
 use chrono::Utc;
-use std::sync::Arc;
-use cdrs_tokio::cluster::NodeTcpConfig;
-use cdrs_tokio::load_balancing::RoundRobin;
-use cdrs_tokio::query::*;
-
 use cdrs_tokio::authenticators::StaticPasswordAuthenticatorProvider;
-use cdrs_tokio::cluster::session::{new as new_session, Session};
-use cdrs_tokio::cluster::{ClusterTcpConfig, NodeTcpConfigBuilder, TcpConnectionPool};
-use cdrs_tokio::retry::DefaultRetryPolicy;
-use cdrs_tokio::types::prelude::*;
-use crate::user_info::UserInfo;
+use std::sync::Arc;
 
+use cdrs_tokio::cluster::session::{new as new_session, Session};
+use cdrs_tokio::cluster::{ClusterTcpConfig, NodeTcpConfigBuilder};
+
+use cdrs_tokio::query::*;
+use cdrs_tokio::retry::{DefaultRetryPolicy};
+
+use cdrs_tokio::load_balancing::RoundRobin;
+use cdrs_tokio::types::prelude::*;
+
+use cdrs_tokio::transport::TransportTcp;
+use crate::user_info::UserInfo;
 
 const KS_NAME: &str = "user_data";
 const USER_TAB_NAME: &str = "user_info";
-type CurrentSession = Session<RoundRobin<TcpConnectionPool>>;
+type CurrentSession = Session<RoundRobin<ConnectionPool<TransportTcp>>>;
 
 const USER:&str = "user";
 const PASSWORD: &str = "password";
+const ADDRESS: &str = "cassandra.rustdemo:9042";
 
-pub async fn create_session() -> Session<RoundRobin<TcpConnectionPool>> {
-    let auth:StaticPasswordAuthenticatorProvider = StaticPasswordAuthenticatorProvider::new(&USER, &PASSWORD);
-    let node:NodeTcpConfig = NodeTcpConfigBuilder::new("cassandra.rustdemo:9042", Arc::new(auth)).build();
-    let cluster_config:ClusterTcpConfig = ClusterTcpConfig(vec![node]);
-    new_session(
+pub async fn create_session() -> CurrentSession {
+    let auth:StaticPasswordAuthenticatorProvider = StaticPasswordAuthenticatorProvider::new(&USER, &PASSWORD);    
+
+    let node = NodeTcpConfigBuilder::new(
+        ADDRESS,
+        Arc::new(auth),
+    )
+    .build();
+    let cluster_config = ClusterTcpConfig(vec![node]);
+
+    let no_compression = new_session(
         &cluster_config,
         RoundRobin::new(),
         Box::new(DefaultRetryPolicy::default()),
     )
     .await
-    .expect("session should be created")
+    .expect("error creating connection pool");
+    
+    no_compression
 }
 
-pub async fn insert_struct(session: &mut CurrentSession) {
+pub async fn insert_struct(session: &CurrentSession) {
     let row = UserInfo {
         userid: uuid::Uuid::new_v4(),
         email: String::from("tom@gmail.com"),
@@ -50,7 +62,7 @@ pub async fn insert_struct(session: &mut CurrentSession) {
         .expect("insert");
 }
 
-pub async fn select_struct(session: &mut CurrentSession)->UserInfo {  
+pub async fn select_struct(session: &CurrentSession)->UserInfo {  
     let select_user_struct_cql: String = format!("SELECT * FROM {}.{}",KS_NAME,USER_TAB_NAME);  
     let rows = session
         .query(&select_user_struct_cql)
@@ -75,7 +87,7 @@ pub async fn create_all(){
     create_table2(&mut no_compression).await;
 }
 
-async fn create_keyspace(session: &mut CurrentSession) {
+async fn create_keyspace(session: &CurrentSession) {
     let create_ks: &'static str = "CREATE KEYSPACE IF NOT EXISTS user_data WITH replication = {'class':'NetworkTopologyStrategy','datacenter1':1, 'replication_factor' : 3};";
     session
         .query(create_ks)
@@ -83,7 +95,7 @@ async fn create_keyspace(session: &mut CurrentSession) {
         .expect("Keyspace creation error");
 }
 
-async fn create_table(session: &mut CurrentSession) {
+async fn create_table(session: &CurrentSession) {
     let create_table_cql =
         "CREATE TABLE IF NOT EXISTS user_data.user_credentials ( userid UUID PRIMARY KEY, password text, email text);";
     session
@@ -92,7 +104,7 @@ async fn create_table(session: &mut CurrentSession) {
         .expect("Table creation error");
 }
 
-async fn create_table2(session: &mut CurrentSession) {
+async fn create_table2(session: &CurrentSession) {
     let create_table_cql =
         "CREATE TABLE IF NOT EXISTS user_data.user_info ( userid UUID PRIMARY KEY, lastname text, firstname text, email text, created_date timestamp, modified_date timestamp, active boolean);";
     session
