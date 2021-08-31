@@ -16,11 +16,12 @@ type CurrentSession = Session<RoundRobin<ConnectionPool<TransportTcp>>>;
 async fn index(pool: web::Data<Arc<CurrentSession>>,path: web::Path<String>) -> Result<HttpResponse> {
     let poolconn = pool.get_ref();
     
-    //let name = path.into_inner();
-    db_ops::insert_struct(&poolconn).await;
+    let name = path.into_inner();
+    //db_ops::insert_struct(&poolconn).await;
     let uinf = db_ops::select_struct(&poolconn).await;
     //format!("Hello {}!", &name)
-    Ok(HttpResponse::Ok().json(uinf))
+    Ok(HttpResponse::Ok().body(format!("Hello {}",&name)))
+    //Ok(HttpResponse::Ok().json(uinf))
 }
 
 #[actix_web::main]
