@@ -21,9 +21,9 @@ type CurrentSession = Session<RoundRobin<ConnectionPool<TransportTcp>>>;
 
 const USER:&str = "user";
 const PASSWORD: &str = "password";
-const ADDRESS: &str = "cassandra.rustdemo:9042";
+const ADDRESS: &str = "localhost:9042";
 
-pub async fn create_session() -> CurrentSession {
+pub async fn create_session() -> Arc<CurrentSession> {
     let auth:StaticPasswordAuthenticatorProvider = StaticPasswordAuthenticatorProvider::new(&USER, &PASSWORD);    
 
     let node = NodeTcpConfigBuilder::new(
@@ -41,10 +41,10 @@ pub async fn create_session() -> CurrentSession {
     .await
     .expect("error creating connection pool");
     
-    no_compression
+    Arc::new(no_compression)
 }
 
-pub async fn insert_struct(session: &CurrentSession) {
+pub async fn insert_struct(session: &Arc<CurrentSession>) {
     let row = UserInfo {
         userid: uuid::Uuid::new_v4(),
         email: String::from("tom@gmail.com"),
@@ -62,7 +62,7 @@ pub async fn insert_struct(session: &CurrentSession) {
         .expect("insert");
 }
 
-pub async fn select_struct(session: &CurrentSession)->UserInfo {  
+pub async fn select_struct(session: &Arc<CurrentSession>)->UserInfo {  
     let select_user_struct_cql: String = format!("SELECT * FROM {}.{}",KS_NAME,USER_TAB_NAME);  
     let rows = session
         .query(&select_user_struct_cql)
@@ -80,14 +80,13 @@ pub async fn select_struct(session: &CurrentSession)->UserInfo {
     my_row
 }
 
-pub async fn create_all(){
-    let mut no_compression: CurrentSession = create_session().await;
-    create_keyspace(&mut no_compression).await;
-    create_table(&mut no_compression).await;
-    create_table2(&mut no_compression).await;
+pub async fn create_all(session: &Arc<CurrentSession>){
+    create_keyspace(session).await;
+    create_table(session).await;
+    create_table2(session).await;
 }
 
-async fn create_keyspace(session: &CurrentSession) {
+async fn create_keyspace(session: &Arc<CurrentSession>) {
     let create_ks: &'static str = "CREATE KEYSPACE IF NOT EXISTS user_data WITH replication = {'class':'NetworkTopologyStrategy','datacenter1':1, 'replication_factor' : 3};";
     session
         .query(create_ks)
@@ -95,7 +94,7 @@ async fn create_keyspace(session: &CurrentSession) {
         .expect("Keyspace creation error");
 }
 
-async fn create_table(session: &CurrentSession) {
+async fn create_table(session: &Arc<CurrentSession>) {
     let create_table_cql =
         "CREATE TABLE IF NOT EXISTS user_data.user_credentials ( userid UUID PRIMARY KEY, password text, email text);";
     session
@@ -104,7 +103,7 @@ async fn create_table(session: &CurrentSession) {
         .expect("Table creation error");
 }
 
-async fn create_table2(session: &CurrentSession) {
+async fn create_table2(session: &Arc<CurrentSession>) {
     let create_table_cql =
         "CREATE TABLE IF NOT EXISTS user_data.user_info ( userid UUID PRIMARY KEY, lastname text, firstname text, email text, created_date timestamp, modified_date timestamp, active boolean);";
     session
