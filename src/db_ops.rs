@@ -95,8 +95,14 @@ async fn create_keyspace(session: &Arc<CurrentSession>) {
 }
 
 async fn create_table(session: &Arc<CurrentSession>) {
+    //"CREATE TABLE IF NOT EXISTS user_data.user_credentials ( userid UUID PRIMARY KEY, password text, email text)
     let create_table_cql =
-        "CREATE TABLE IF NOT EXISTS user_data.user_credentials ( userid UUID PRIMARY KEY, password text, email text);";
+        "CREATE OR ALTER TABLE user_data.user_credentials ( userid UUID PRIMARY KEY, password text, email text)
+            WITH comment = 'user creds'
+            AND compaction = { 'class': 'LeveledCompactionStrategy', 'sstable_size_in_mb' : 512 }
+            AND compression = { 'class': 'LZ4Compressor', 'chunk_length_kb' : 16 }
+            AND default_time_to_live = 0
+            AND speculative_retry = '99percentile'";
     session
         .query(create_table_cql)
         .await
@@ -104,8 +110,14 @@ async fn create_table(session: &Arc<CurrentSession>) {
 }
 
 async fn create_table2(session: &Arc<CurrentSession>) {
+    // "CREATE TABLE IF NOT EXISTS user_data.user_info ( userid UUID PRIMARY KEY, lastname text, firstname text, email text, created_date timestamp, modified_date timestamp, active boolean)
     let create_table_cql =
-        "CREATE TABLE IF NOT EXISTS user_data.user_info ( userid UUID PRIMARY KEY, lastname text, firstname text, email text, created_date timestamp, modified_date timestamp, active boolean);";
+        "CREATE OR ALTER TABLE user_data.user_info ( userid UUID PRIMARY KEY, lastname text, firstname text, email text, created_date timestamp, modified_date timestamp, active boolean)
+            WITH comment = 'user info'
+            AND compaction = { 'class': 'LeveledCompactionStrategy', 'sstable_size_in_mb' : 512 }
+            AND compression = { 'class': 'LZ4Compressor', 'chunk_length_kb' : 16 }
+            AND default_time_to_live = 0
+            AND speculative_retry = '99percentile'";
     session
         .query(create_table_cql)
         .await
