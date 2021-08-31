@@ -1,35 +1,50 @@
-use chrono::Utc;
-use std::sync::Arc;
-use cdrs_tokio::cluster::NodeTcpConfig;
-use cdrs_tokio::load_balancing::RoundRobin;
-use cdrs_tokio::query::*;
-
 use cdrs_tokio::authenticators::StaticPasswordAuthenticatorProvider;
+use std::sync::Arc;
+
+use cdrs_tokio::authenticators::NoneAuthenticatorProvider;
 use cdrs_tokio::cluster::session::{new as new_session, Session};
-use cdrs_tokio::cluster::{ClusterTcpConfig, NodeTcpConfigBuilder, TcpConnectionPool};
-use cdrs_tokio::retry::DefaultRetryPolicy;
+use cdrs_tokio::cluster::{ClusterTcpConfig, NodeTcpConfigBuilder, TcpConnectionManager};
+use cdrs_tokio::query::*;
+use cdrs_tokio::query_values;
+use cdrs_tokio::retry::{DefaultRetryPolicy, NeverReconnectionPolicy};
+
+use cdrs_tokio::frame::AsBytes;
+use cdrs_tokio::load_balancing::RoundRobin;
+use cdrs_tokio::types::from_cdrs::FromCdrsByName;
 use cdrs_tokio::types::prelude::*;
+
+use cdrs_tokio::transport::TransportTcp;
+use cdrs_tokio_helpers_derive::*;
 use crate::user_info::UserInfo;
 
 
 const KS_NAME: &str = "user_data";
 const USER_TAB_NAME: &str = "user_info";
-type CurrentSession = Session<RoundRobin<TcpConnectionPool>>;
+type CurrentSession = Session<TransportTcp, TcpConnectionManager, RoundRobin<TcpConnectionManager>>;
 
 const USER:&str = "user";
 const PASSWORD: &str = "password";
+const ADDRESS: &str = "cassandra.rustdemo:9042";
 
-pub async fn create_session() -> Session<RoundRobin<TcpConnectionPool>> {
+pub async fn create_session() -> Arc<CurrentSession> {
     let auth:StaticPasswordAuthenticatorProvider = StaticPasswordAuthenticatorProvider::new(&USER, &PASSWORD);
-    let node:NodeTcpConfig = NodeTcpConfigBuilder::new("cassandra.rustdemo:9042", Arc::new(auth)).build();
-    let cluster_config:ClusterTcpConfig = ClusterTcpConfig(vec![node]);
-    new_session(
-        &cluster_config,
-        RoundRobin::new(),
-        Box::new(DefaultRetryPolicy::default()),
+    let node = NodeTcpConfigBuilder::new(
+        ADDRESS.parse().unwrap(),
+        Arc::new(auth),
     )
-    .await
-    .expect("session should be created")
+    .build();
+    let cluster_config = ClusterTcpConfig(vec![node]);
+    let lb = RoundRobin::new();
+
+    Arc::new(
+        new_session(
+            &cluster_config,
+            lb,
+            Box::new(NeverReconnectionPolicy::default()),
+        )
+        .await
+        .expect("session should be created"),
+    )
 }
 
 pub async fn insert_struct(session: &mut CurrentSession) {
