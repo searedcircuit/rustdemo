@@ -1,13 +1,55 @@
+kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: data
+provisioner: microk8s.io/hostpath
+parameters:
+  type: pd-ssd
+  repl: "3"
+  #io_profile: "db_remote"
+  #priority_io: "high"
+  #fg: "true"
+---
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: pv-data
+  labels:
+    type: local
+spec:
+  capacity:
+    storage: 5Gi
+  hostPath:
+    path: /mnt/data
+    type: ''
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: data
+  volumeMode: Filesystem
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: cassandra
+  name: cassandra
+spec:
+  clusterIP: None
+  ports:
+    - port: 9042
+  selector:
+    app: cassandra
+---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: cassandra
-  namespace: rustdemo
   labels:
     app: cassandra
 spec:
   serviceName: cassandra
-  replicas: 3
+  replicas: 1
   selector:
     matchLabels:
       app: cassandra
@@ -19,7 +61,7 @@ spec:
       terminationGracePeriodSeconds: 1800
       containers:
       - name: cassandra
-        image: gcr.io/google-samples/cassandra:v13
+        image: cassandra
         imagePullPolicy: Always
         ports:
         - containerPort: 7000
@@ -54,7 +96,7 @@ spec:
           - name: HEAP_NEWSIZE
             value: 100M
           - name: CASSANDRA_SEEDS
-            value: "cassandra-0.cassandra.default.svc.cluster.local"
+            value: "cassandra-0.cassandra.rustdemo.svc.cluster.local"
           - name: CASSANDRA_CLUSTER_NAME
             value: "K8Demo"
           - name: CASSANDRA_DC
@@ -65,14 +107,6 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: status.podIP
-        readinessProbe:
-          exec:
-            command:
-            - /bin/bash
-            - -c
-            - /ready-probe.sh
-          initialDelaySeconds: 15
-          timeoutSeconds: 5
         # These volume mounts are persistent. They are like inline claims,
         # but not exactly because the names need to match exactly one of
         # the stateful pod volumes.
@@ -87,16 +121,7 @@ spec:
       name: cassandra-data
     spec:
       accessModes: [ "ReadWriteOnce" ]
-      storageClassName: fast
+      storageClassName: data
       resources:
         requests:
-          storage: 1Gi
----
-kind: StorageClass
-apiVersion: storage.k8s.io/v1
-metadata:
-  name: fast
-  namespace: rustdemo
-provisioner: k8s.io/minikube-hostpath
-parameters:
-  type: pd-ssd
+          storage: 5Gi
