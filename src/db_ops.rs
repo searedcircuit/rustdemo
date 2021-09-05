@@ -44,10 +44,11 @@ pub async fn create_session() -> Arc<CurrentSession> {
     Arc::new(no_compression)
 }
 
-pub async fn insert_struct(session: &Arc<CurrentSession>) {
+pub async fn insert_struct(session: &Arc<CurrentSession>, email: &str) -> uuid::Uuid {
+    let userid = uuid::Uuid::new_v4();
     let row = UserInfo {
-        userid: uuid::Uuid::new_v4(),
-        email: String::from("tom@gmail.com"),
+        userid: userid,
+        email: email.to_string(),
         firstname: String::from("tom"),
         lastname: String::from("bob"),
         created_date: Utc::now(),
@@ -60,10 +61,11 @@ pub async fn insert_struct(session: &Arc<CurrentSession>) {
         .query_with_values(&insert_user_struct_cql, row.into_query_values())
         .await
         .expect("insert");
+    userid
 }
 
-pub async fn select_struct(session: &Arc<CurrentSession>)->UserInfo {  
-    let select_user_struct_cql: String = format!("SELECT * FROM {}.{}",KS_NAME,USER_TAB_NAME);  
+pub async fn select_struct(session: &Arc<CurrentSession>, userid: uuid::Uuid)->UserInfo {  
+    let select_user_struct_cql: String = format!("SELECT * FROM {}.{} WHERE userid = {} LIMIT 1",KS_NAME,USER_TAB_NAME,userid);  
     let rows = session
         .query(&select_user_struct_cql)
         .await
@@ -97,7 +99,8 @@ async fn create_keyspace(session: &Arc<CurrentSession>) {
 async fn create_table(session: &Arc<CurrentSession>) {
     //"CREATE TABLE IF NOT EXISTS user_data.user_credentials ( userid UUID PRIMARY KEY, password text, email text)
     let create_table_cql =
-        "ALTER TABLE user_data.user_credentials
+        //"ALTER TABLE user_data.user_credentials
+        "CREATE TABLE IF NOT EXISTS user_data.user_credentials ( userid UUID PRIMARY KEY, password text, email text)
             WITH bloom_filter_fp_chance = 0.01
             AND caching = {'keys': 'NONE', 'rows_per_partition': '100'}
             AND comment = ''
@@ -119,7 +122,8 @@ async fn create_table(session: &Arc<CurrentSession>) {
 async fn create_table2(session: &Arc<CurrentSession>) {
     // "CREATE TABLE IF NOT EXISTS user_data.user_info ( userid UUID PRIMARY KEY, lastname text, firstname text, email text, created_date timestamp, modified_date timestamp, active boolean)
     let create_table_cql =
-        "ALTER TABLE user_data.user_info        
+        //"ALTER TABLE user_data.user_info  
+        "CREATE TABLE IF NOT EXISTS user_data.user_info ( userid UUID PRIMARY KEY, lastname text, firstname text, email text, created_date timestamp, modified_date timestamp, active boolean)      
             WITH bloom_filter_fp_chance = 0.01
             AND caching = {'keys': 'NONE', 'rows_per_partition': '100'}
             AND comment = ''

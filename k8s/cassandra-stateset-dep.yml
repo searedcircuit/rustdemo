@@ -2,10 +2,11 @@ kind: StorageClass
 apiVersion: storage.k8s.io/v1
 metadata:
   name: data
-provisioner: microk8s.io/hostpath
+#provisioner: microk8s.io/hostPath
+provisioner: kubernetes.io/no-provisioner
 parameters:
   type: pd-ssd
-  repl: "3"
+volumeBindingMode: WaitForFirstConsumer
   #io_profile: "db_remote"
   #priority_io: "high"
   #fg: "true"
@@ -21,12 +22,9 @@ spec:
     storage: 5Gi
   hostPath:
     path: /mnt/data
-    type: ''
   accessModes:
     - ReadWriteOnce
-  persistentVolumeReclaimPolicy: Retain
-  storageClassName: data
-  volumeMode: Filesystem
+  storageClassName: data    
 ---
 apiVersion: v1
 kind: Service
@@ -74,10 +72,10 @@ spec:
           name: cql
         resources:
           limits:
-            cpu: "500m"
-            memory: 1Gi
+            cpu: 2
+            memory: 3Gi
           requests:
-            cpu: "500m"
+            cpu: "0.5"
             memory: 1Gi
         securityContext:
           capabilities:
@@ -107,6 +105,14 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: status.podIP
+        readinessProbe:
+          exec:
+            command:
+            - /bin/bash
+            - -c
+            - 'cqlsh -e "describe cluster" | awk "/Connection error/{exit 1}"'
+          initialDelaySeconds: 15
+          timeoutSeconds: 5            
         # These volume mounts are persistent. They are like inline claims,
         # but not exactly because the names need to match exactly one of
         # the stateful pod volumes.
