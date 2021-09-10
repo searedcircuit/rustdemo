@@ -1,3 +1,4 @@
+use cdrs_tokio::load_balancing::Random;
 use cdrs_tokio::cluster::ConnectionPool;
 use chrono::Utc;
 use cdrs_tokio::authenticators::StaticPasswordAuthenticatorProvider;
@@ -31,11 +32,12 @@ pub async fn create_session() -> Arc<CurrentSession> {
         Arc::new(auth),
     )
     .build();
+    
     let cluster_config = ClusterTcpConfig(vec![node]);
 
     let no_compression = new_session(
         &cluster_config,
-        RoundRobin::new(),
+        Random::new(vec![Arc::new(node)]),
         Box::new(DefaultRetryPolicy::default()),
     )
     .await
