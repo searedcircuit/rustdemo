@@ -1,31 +1,99 @@
-kind: StorageClass
 apiVersion: storage.k8s.io/v1
+kind: StorageClass
 metadata:
-  name: data
-#provisioner: microk8s.io/hostPath
+  name: data  
 provisioner: kubernetes.io/no-provisioner
-parameters:
-  type: pd-ssd
 volumeBindingMode: WaitForFirstConsumer
-  #io_profile: "db_remote"
-  #priority_io: "high"
-  #fg: "true"
 ---
-kind: PersistentVolume
 apiVersion: v1
+kind: ConfigMap
 metadata:
-  name: pv-data
-  labels:
-    type: local
+  name: cassandra
+data:
+  ready-probe.sh: |
+    #!/bin/bash
+
+    if [[ $(nodetool status | grep $POD_IP) == *"UN"* ]]; then
+      if [[ $DEBUG ]]; then
+        echo "UN";
+      fi
+      exit 0;
+    else
+      if [[ $DEBUG ]]; then
+        echo "Not Up";
+      fi
+      exit 1;
+    fi  
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: ringtail-pv
 spec:
+  storageClassName: data    
+  persistentVolumeReclaimPolicy: Retain
   capacity:
     storage: 5Gi
-  hostPath:
-    path: /mnt/data
   accessModes:
-    - ReadWriteOnce
-  storageClassName: data    
+  - ReadWriteOnce
+  volumeMode: Filesystem  
+  local:
+    path: "/mnt/data/cassandra"
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - ringtail
 ---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: wombat-pv
+spec:
+  storageClassName: data    
+  persistentVolumeReclaimPolicy: Retain
+  capacity:
+    storage: 5Gi
+  accessModes:
+  - ReadWriteOnce
+  volumeMode: Filesystem  
+  local:
+    path: "/mnt/data/cassandra"
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - wombat               
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: wallaby-pv
+spec:
+  storageClassName: data    
+  persistentVolumeReclaimPolicy: Retain
+  capacity:
+    storage: 5Gi
+  accessModes:
+  - ReadWriteOnce
+  volumeMode: Filesystem  
+  local:
+    path: "/mnt/data/cassandra"
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - wallaby
+---  
 apiVersion: v1
 kind: Service
 metadata:
@@ -45,7 +113,7 @@ metadata:
   name: cassandra
   labels:
     app: cassandra
-spec:
+spec:  
   serviceName: cassandra
   replicas: 1
   selector:
@@ -57,10 +125,10 @@ spec:
         app: cassandra
     spec:
       terminationGracePeriodSeconds: 1800
-      containers:
+      containers:        
       - name: cassandra
-        image: cassandra
-        imagePullPolicy: Always
+        image: arm64v8/cassandra
+        imagePullPolicy: Always     
         ports:
         - containerPort: 7000
           name: intra-node
@@ -94,7 +162,7 @@ spec:
           - name: HEAP_NEWSIZE
             value: 100M
           - name: CASSANDRA_SEEDS
-            value: "cassandra-0.cassandra.rustdemo.svc.cluster.local"
+            value: "cassandra-0.cassandra.cass.svc.cluster.local"
           - name: CASSANDRA_CLUSTER_NAME
             value: "K8Demo"
           - name: CASSANDRA_DC
@@ -108,9 +176,10 @@ spec:
         readinessProbe:
           exec:
             command:
-            - /bin/bash
-            - -c
-            - 'cqlsh -e "describe cluster" | awk "/Connection error/{exit 1}"'
+              - /bin/bash
+              - -c
+              - exec
+              - /opt/ready-probe.sh
           initialDelaySeconds: 15
           timeoutSeconds: 5            
         # These volume mounts are persistent. They are like inline claims,
@@ -118,7 +187,20 @@ spec:
         # the stateful pod volumes.
         volumeMounts:
         - name: cassandra-data
-          mountPath: /cassandra_data
+          mountPath: /var/lib/cassandra
+        - name: cassandra-ready-probe
+          mountPath: /opt/ready-probe.sh
+          subPath: ready-probe.sh 
+      volumes:
+        - name: cassandra-ready-probe
+          configMap:
+            name: cassandra   
+        # - name: cassandra-data
+        #   hostPath:
+        #     # directory location on host
+        #     path: /tmp
+        #     # this field is optional
+        #     type: Directory                                  
   # These are converted to volume claims by the controller
   # and mounted at the paths mentioned above.
   # do not use these in production until ssd GCEPersistentDisk or other ssd pd
@@ -128,6 +210,80 @@ spec:
     spec:
       accessModes: [ "ReadWriteOnce" ]
       storageClassName: data
+      #volumeName: ringtail-pv
       resources:
         requests:
-          storage: 5Gi
+          storage: 5Gi     
+
+
+
+# apiVersion: storage.k8s.io/v1
+# kind: StorageClass
+# metadata:
+#   name: data
+#   annotations:
+#     storageclass.kubernetes.io/is-default-class: "true"                   
+# provisioner: kubernetes.io/no-provisioner
+# volumeBindingMode: WaitForFirstConsumer
+
+# apiVersion: storage.k8s.io/v1
+# kind: StorageClass
+# metadata:
+#   name: data                 
+# provisioner: microk8s.io/hostpath
+# volumeBindingMode: Immediate
+
+
+# kind: StorageClass
+# apiVersion: storage.k8s.io/v1
+# metadata:
+#   name: data
+# provisioner: kubernetes.io/no-provisioner
+# parameters:
+#   type: pd-ssd
+#   priority_io:  "high"  
+# volumeBindingMode: WaitForFirstConsumer
+#   #io_profile: "db_remote"
+#   #priority_io: "high"
+#   #fg: "true"
+# ---
+# apiVersion: v1
+# kind: PersistentVolumeClaim
+# metadata:
+#   name: cass-pvc
+#   namespace: rustdemo
+# spec:
+#   storageClassName: "" # Empty string must be explicitly set otherwise default StorageClass will be set
+#   volumeName: cass-pv
+#   accessModes:
+#     - ReadWriteOnce  
+#   resources:
+#     requests:
+#       storage: 5Gi  
+# ---
+# apiVersion: v1
+# kind: PersistentVolume
+# metadata:
+#   name: cass-pv
+# spec:
+#   storageClassName: ""
+#   claimRef:
+#     name: cass-pvc
+#     namespace: rustdemo
+    
+#   persistentVolumeReclaimPolicy: Retain
+#   capacity:
+#     storage: 5Gi
+#   accessModes:
+#   - ReadWriteOnce
+#   volumeMode: Filesystem  
+#   local:
+#     path: "/mnt/data"
+#   nodeAffinity:
+#     required:
+#       nodeSelectorTerms:
+#         - matchExpressions:
+#             - key: kubernetes.io/hostname
+#               operator: In
+#               values:
+#                 - ringtail
