@@ -3,9 +3,8 @@ use chrono::prelude::*;
 
 use serde::{Deserialize,Serialize};
 
-
 #[derive(Clone,PartialEq,Serialize,Deserialize)]
-pub struct UserInfo{
+pub struct DbUserInfo{
     pub userid: Uuid,
     pub email: Option<String>,
     pub firstname: Option<String>,
@@ -15,22 +14,9 @@ pub struct UserInfo{
     pub modified_date: DateTime<Utc>,
 }
 
-// impl UserInfo {
-//     pub fn into_query_values(self) -> QueryValues {
-//         query_values!(
-//             "userid" => self.userid, 
-//             "email" => self.email, 
-//             "firstname" => self.firstname, 
-//             "lastname" => self.lastname,
-//             "active"=>self.active, 
-//             "created_date"=>self.created_date, 
-//             "modified_date"=>self.modified_date)
-//     }
-// }
-
-impl Default for UserInfo {
-    fn default () -> UserInfo{ 
-        UserInfo {
+impl Default for DbUserInfo {
+    fn default () -> DbUserInfo{ 
+        DbUserInfo {
             userid: Uuid::nil(),
             email:Some(String::new()),
             firstname: Some(String::new()),

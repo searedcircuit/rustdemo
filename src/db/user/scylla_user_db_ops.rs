@@ -7,32 +7,24 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use scylla::transport::session::{IntoTypedRows, Session};
-
-use crate::user_info::UserInfo;
+use crate::data::request::user::create_user_request::CreateUserRequest;
+use crate::data::db::db_user_info::DbUserInfo;
 
 const KS_NAME: &str = "user_data";
 const USER_TAB_NAME: &str = "user_info";
 
-pub async fn insert_user(session: &Arc<Session>, email: &str) -> Result<uuid::Uuid, QueryError> {
+pub async fn insert_user(session: &Arc<Session>, user: &mut CreateUserRequest) -> Result<uuid::Uuid, QueryError> {
     let userid = uuid::Uuid::new_v4();
-    let row = UserInfo {
-        userid: userid,
-        email: Some(email.to_string()),
-        firstname: Some("tom".to_string()),
-        lastname: Some("bob".to_string()),
-        created_date: Utc::now(),
-        modified_date: Utc::now(),
-        active:false
-    };
 
     let insert_user_struct_cql: String = format!("INSERT INTO {}.{} \
     (userid, email, firstname, lastname, created_date, modified_date, active) VALUES (?, ?, ?, ?, ?, ?, ?)",KS_NAME,USER_TAB_NAME);
 
-    let created = Duration::seconds(row.created_date.timestamp());
-    let modified = Duration::seconds(row.modified_date.timestamp());
+    let now = Utc::now();
+    let created = Duration::seconds(now.timestamp());
+    let modified = Duration::seconds(now.timestamp());
 
     let res = session
-        .query(insert_user_struct_cql, (row.userid, row.email, row.firstname, row.lastname,Timestamp(created),Timestamp(modified),row.active))
+        .query(insert_user_struct_cql, (userid, &user.email, &user.firstname, &user.lastname,Timestamp(created),Timestamp(modified),false))
         .await;
     match res {
         Ok(_) => Ok(userid),
@@ -40,10 +32,10 @@ pub async fn insert_user(session: &Arc<Session>, email: &str) -> Result<uuid::Uu
     }
 }
 
-pub async fn select_user(session: &Arc<Session>, userid: uuid::Uuid)-> Result<UserInfo,QueryError> {  
+pub async fn select_user(session: &Arc<Session>, userid: uuid::Uuid)-> Result<DbUserInfo,QueryError> {  
     let select_user_struct_cql: String = format!("SELECT userid, email, firstname, lastname, created_date, modified_date, active FROM {}.{} WHERE userid = {} LIMIT 1",KS_NAME,USER_TAB_NAME,userid);  
     
-    let mut my_row: UserInfo = UserInfo::default();  
+    let mut my_row: DbUserInfo = DbUserInfo::default();  
     if let Some(rows) = session.query(select_user_struct_cql,&[]).await?.rows {
         for row in rows.into_typed::<(uuid::Uuid, String,String,String, Duration, Duration, bool)>() {
             if let Ok(r) = row {
