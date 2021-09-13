@@ -14,7 +14,7 @@ const USER_TAB_NAME: &str = "user_info";
 
 // const USER:&str = "user";
 // const PASSWORD: &str = "password";
-const ADDRESS: &str = "localhost:9042";
+const ADDRESS: &str = "cassandra:9042";
 
 pub async fn create_session() -> Result<Arc<Session>,NewSessionError> {
     //let uri = env::var("cassandra:9042").unwrap_or_else(|_| "127.0.0.1:9042".to_string());

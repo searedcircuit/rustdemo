@@ -119,7 +119,7 @@ spec:
     spec:
       containers:
         - name: scylla
-          image: scylladb/scylla-aarch64:4.6.dev-0.20210817.9c7bcd1d8
+          image: scylladb/scylla-nightly:4.6.dev-0.20210908.58a9a24ff-aarch64
           imagePullPolicy: Always
           args: ["--seeds", "scylla-0.scylla.cass.svc.cluster.local"]
           ports:
@@ -133,7 +133,7 @@ spec:
               name: cql
           resources:
             limits:
-              cpu: 1.5
+              cpu: 500m
               memory: 3Gi
             requests:
               cpu: 500m
