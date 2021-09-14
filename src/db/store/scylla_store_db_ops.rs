@@ -8,10 +8,8 @@ use std::sync::Arc;
 use anyhow::Result;
 use scylla::transport::session::{IntoTypedRows, Session};
 
-use crate::data::{
-    db::db_user_info::DbUserInfo, 
-    request::store::create_store_user_request::CreateStoreUserRequest
-};
+use crate::data::request::store::CreateStoreUserRequest;
+use crate::data::db::DbUserInfo;
 
 const STORE_KS_NAME: &str = "store_data";
 const STORE_USER_CREDS_TAB_NAME: &str = "store_user_credentials";

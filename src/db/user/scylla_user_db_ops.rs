@@ -8,7 +8,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use scylla::transport::session::{IntoTypedRows, Session};
 use crate::data::request::user::create_user_request::CreateUserRequest;
-use crate::data::db::db_user_info::DbUserInfo;
+use crate::data::db::DbUserInfo;
 
 const KS_NAME: &str = "user_data";
 const USER_TAB_NAME: &str = "user_info";
