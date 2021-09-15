@@ -40,6 +40,7 @@ pub mod db{
         pub use scylla_user_db_ops::create_all as user_create_all;
         pub use scylla_user_db_ops::insert_user;
         pub use scylla_user_db_ops::select_user;
+        pub use scylla_user_db_ops::user_login;
     }
     pub mod store{
         mod scylla_store_db_ops;
@@ -52,7 +53,7 @@ pub mod handlers{
     mod user_handler;
     mod store_user_handler;
 
-    pub use user_handler::{create as user_create,get as user_get};    
+    pub use user_handler::{create as user_create,get as user_get,login as user_login};    
     pub use store_user_handler::{create as store_create, get as store_get}; 
 }
 
@@ -66,6 +67,7 @@ async fn main() -> std::io::Result<()> {
        HttpServer::new(move|| App::new()
        .service(handlers::user_create).app_data(web::Data::new(pool.clone()))
        .service(handlers::user_get).app_data(web::Data::new(pool.clone()))
+       .service(handlers::user_login).app_data(web::Data::new(pool.clone()))
        
        .service(handlers::store_create).app_data(web::Data::new(pool.clone()))
        .service(handlers::store_get).app_data(web::Data::new(pool.clone()))

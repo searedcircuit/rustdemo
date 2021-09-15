@@ -1,4 +1,3 @@
-use scylla::frame::value::Timestamp;
 use chrono::Duration;
 use chrono::prelude::*;
 use scylla::transport::errors::QueryError;
@@ -6,30 +5,76 @@ use chrono::Utc;
 use std::sync::Arc;
 
 use anyhow::Result;
+use scylla::frame::value::Timestamp;
 use scylla::transport::session::{IntoTypedRows, Session};
-use crate::data::request::user::create_user_request::CreateUserRequest;
-use crate::data::db::DbUserInfo;
+
+use crate::data::{
+    db::DbUserInfo, 
+    request::{
+        auth::UserLoginRequest, 
+        user::create_user_request::CreateUserRequest
+    }
+};
 
 const KS_NAME: &str = "user_data";
 const USER_TAB_NAME: &str = "user_info";
+const USER_CREDS_TAB_NAME: &str = "user_credentials";
 
-pub async fn insert_user(session: &Arc<Session>, user: &mut CreateUserRequest) -> Result<uuid::Uuid, QueryError> {
+const USER_ID: &str = "userid";
+const USER_EMAIL: &str = "email";
+const USER_PASSWORD_HASH: &str = "password";
+const USER_IS_ACTIVE: &str = "active";
+
+
+pub async fn insert_user(session: &Arc<Session>, user: &CreateUserRequest) -> Result<uuid::Uuid, QueryError> {
     let userid = uuid::Uuid::new_v4();
 
-    let insert_user_struct_cql: String = format!("INSERT INTO {}.{} \
+    let insert_user_info_cql: String = format!("INSERT INTO {}.{} 
     (userid, email, firstname, lastname, created_date, modified_date, active) VALUES (?, ?, ?, ?, ?, ?, ?)",KS_NAME,USER_TAB_NAME);
+
+    let insert_user_creds_cql: String = format!("INSERT INTO {}.{} 
+    (userid, email, password, active) VALUES (?, ?, ?, ?)",KS_NAME,USER_CREDS_TAB_NAME);
 
     let now = Utc::now();
     let created = Duration::seconds(now.timestamp());
     let modified = Duration::seconds(now.timestamp());
 
-    let res = session
-        .query(insert_user_struct_cql, (userid, &user.email, &user.firstname, &user.lastname,Timestamp(created),Timestamp(modified),false))
-        .await;
-    match res {
-        Ok(_) => Ok(userid),
-        Err(e) => panic!("{}",e)
+    session
+        .query(insert_user_info_cql, (userid, &user.email, &user.firstname, &user.lastname,Timestamp(created),Timestamp(modified),false))
+        .await?;
+    session
+        .query(insert_user_creds_cql, (userid, &user.email, &user.password_hash, false))
+        .await?;
+
+    Ok(userid)
+}
+
+pub async fn user_login(session: &Arc<Session>, login_request: &UserLoginRequest)-> Result<uuid::Uuid,String> {  
+    let mut email = String::new();
+    let mut pass = String::new();
+    match &login_request.email {
+        Some(e) => {email=e.to_string();}
+        _ => return Ok(uuid::Uuid::default()),
     }
+    match &login_request.password_hash {
+        Some(p) => {pass=p.to_string();}
+        _ => return Ok(uuid::Uuid::default()),
+    }
+    let select_user_login_cql: String = format!("SELECT userid, password, active FROM {}.{} WHERE {} = '{}' LIMIT 1",KS_NAME,USER_CREDS_TAB_NAME,USER_EMAIL,email);
+
+    let mut userid = uuid::Uuid::default();
+    if let Some(rows) = session.query(select_user_login_cql,&[]).await
+    .or_else(|q| Err(format!("query error: {}",q)))?.rows {
+        for row in rows.into_typed::<(uuid::Uuid,String,bool)>() {
+            let r = row.or_else(|e|Err(format!("invalid login: {}",e)))?;
+            userid = r.0;
+            let password = r.1;
+            let active = r.2;
+            if !active{return Err("account is not activated".to_string())}
+            if !password.eq(&pass){return Err("invalid login".to_string())}
+        }
+    }
+    Ok(userid)
 }
 
 pub async fn select_user(session: &Arc<Session>, userid: uuid::Uuid)-> Result<DbUserInfo,QueryError> {  
@@ -70,8 +115,8 @@ async fn create_user_data_keyspace(session: &Arc<Session>) -> Result<()> {
 async fn create_user_credentials_table(session: &Arc<Session>) -> Result<()> {
     //"CREATE TABLE IF NOT EXISTS user_data.user_credentials ( userid UUID PRIMARY KEY, password text, email text)
     let create_table_cql =
-        //"ALTER TABLE user_data.user_credentials
-        "CREATE TABLE IF NOT EXISTS user_data.user_credentials ( userid UUID PRIMARY KEY, password text, email text)";
+        //"ALTER TABLE user_data.user_credentials ADD active boolean";
+        "CREATE TABLE IF NOT EXISTS user_data.user_credentials ( email text PRIMARY KEY, userid UUID, password text, active boolean)";
     session
         .query(create_table_cql,&[])
         .await?;

@@ -3,7 +3,8 @@ use std::sync::Arc;
 use actix_web::{get,post, web,HttpResponse,Result};
 use scylla::Session;
 
-use crate::db::user::{insert_user,select_user};
+use crate::data::request::auth::UserLoginRequest;
+use crate::db::user::{insert_user,select_user,user_login};
 use crate::data::request::user::CreateUserRequest;
 
 #[post("/user/create")]
@@ -21,6 +22,22 @@ let poolconn = pool.get_ref();
             Ok(HttpResponse::BadRequest()
             .content_type("application/json")
             .body(format!(r#"{{"error":"{}"}}"#, err)))
+    }
+}
+
+#[post("/user/login")]
+async fn login(pool: web::Data<Arc<Session>>,login_content: web::Json<UserLoginRequest>) -> Result<HttpResponse> {
+    let poolconn = pool.get_ref();
+    let login = login_content.into_inner();
+
+    let res = user_login(poolconn,&login).await;
+    match res {
+        Ok(userid)=>
+            Ok(HttpResponse::Ok().json(userid)),
+        Err(e) => 
+            Ok(HttpResponse::BadRequest()
+            .content_type("application/json")
+            .body(format!(r#"{{"error":"{}"}}"#, e)))
     }
 }
 
