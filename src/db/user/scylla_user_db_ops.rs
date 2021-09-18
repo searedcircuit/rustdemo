@@ -1,10 +1,9 @@
-use chrono::Duration;
 use chrono::prelude::*;
+use chrono::{Utc,Duration};
+use tokio::try_join;
 use scylla::transport::errors::QueryError;
-use chrono::Utc;
 use std::sync::Arc;
 
-use anyhow::Result;
 use scylla::frame::value::Timestamp;
 use scylla::transport::session::{IntoTypedRows, Session};
 
@@ -19,6 +18,7 @@ use crate::data::{
 const KS_NAME: &str = "user_data";
 const USER_TAB_NAME: &str = "user_info";
 const USER_CREDS_TAB_NAME: &str = "user_credentials";
+const USER_ACTIVATION_TAB_NAME: &str = "user_activation";
 
 const USER_ID: &str = "userid";
 const USER_EMAIL: &str = "email";
@@ -28,23 +28,29 @@ const USER_IS_ACTIVE: &str = "active";
 
 pub async fn insert_user(session: &Arc<Session>, user: &CreateUserRequest) -> Result<uuid::Uuid, QueryError> {
     let userid = uuid::Uuid::new_v4();
+    let activation_code = uuid::Uuid::new_v4();
 
     let insert_user_info_cql: String = format!("INSERT INTO {}.{} 
-    (userid, email, firstname, lastname, created_date, modified_date, active) VALUES (?, ?, ?, ?, ?, ?, ?)",KS_NAME,USER_TAB_NAME);
+        (userid, email, firstname, lastname, created_date, modified_date, active) VALUES (?, ?, ?, ?, ?, ?, ?)",KS_NAME,USER_TAB_NAME);
 
     let insert_user_creds_cql: String = format!("INSERT INTO {}.{} 
-    (userid, email, password, active) VALUES (?, ?, ?, ?)",KS_NAME,USER_CREDS_TAB_NAME);
+        (userid, email, password, active) VALUES (?, ?, ?, ?)",KS_NAME,USER_CREDS_TAB_NAME);
+
+    let insert_activation_code_cql: String = format!("INSERT INTO {}.{} 
+        (activation_code, userid) VALUES (?, ?)",KS_NAME,USER_ACTIVATION_TAB_NAME);
 
     let now = Utc::now();
     let created = Duration::seconds(now.timestamp());
     let modified = Duration::seconds(now.timestamp());
 
-    session
-        .query(insert_user_info_cql, (userid, &user.email, &user.firstname, &user.lastname,Timestamp(created),Timestamp(modified),false))
-        .await?;
-    session
-        .query(insert_user_creds_cql, (userid, &user.email, &user.password_hash, false))
-        .await?;
+    let info_future = session
+        .query(insert_user_info_cql, (userid, &user.email, &user.firstname, &user.lastname,Timestamp(created),Timestamp(modified),false));
+    let creds_future = session
+        .query(insert_user_creds_cql, (userid, &user.email, &user.password_hash, false));
+    let activation_future = session
+        .query(insert_activation_code_cql, (activation_code, userid));        
+
+    try_join!(info_future,creds_future,activation_future);
 
     Ok(userid)
 }
@@ -53,12 +59,12 @@ pub async fn user_login(session: &Arc<Session>, login_request: &UserLoginRequest
     let mut email = String::new();
     let mut pass = String::new();
     match &login_request.email {
-        Some(e) => {email=e.to_string();}
-        _ => return Ok(uuid::Uuid::default()),
+        Some(e) => email=e.to_string(),
+        _ => return Err("email is required".to_string()),
     }
     match &login_request.password_hash {
-        Some(p) => {pass=p.to_string();}
-        _ => return Ok(uuid::Uuid::default()),
+        Some(p) => pass=p.to_string(),
+        _ => return Err("password is required".to_string()),
     }
     let select_user_login_cql: String = format!("SELECT userid, password, active FROM {}.{} WHERE {} = '{}' LIMIT 1",KS_NAME,USER_CREDS_TAB_NAME,USER_EMAIL,email);
 
@@ -97,14 +103,14 @@ pub async fn select_user(session: &Arc<Session>, userid: uuid::Uuid)-> Result<Db
     Ok(my_row)
 }
 
-pub async fn create_all(session: &Arc<Session>) -> Result<()> {
+pub async fn create_all(session: &Arc<Session>) -> Result<(), QueryError> {
     create_user_data_keyspace(session).await?;
     create_user_credentials_table(session).await?;
     create_user_info_table(session).await?;
     Ok(())
 }
 
-async fn create_user_data_keyspace(session: &Arc<Session>) -> Result<()> {
+async fn create_user_data_keyspace(session: &Arc<Session>) -> Result<(), QueryError> {
     let create_ks: &'static str = "CREATE KEYSPACE IF NOT EXISTS user_data WITH replication = {'class':'NetworkTopologyStrategy','datacenter1':1, 'replication_factor' : 3};";
     session
         .query(create_ks,&[])
@@ -112,7 +118,7 @@ async fn create_user_data_keyspace(session: &Arc<Session>) -> Result<()> {
     Ok(())
 }
 
-async fn create_user_credentials_table(session: &Arc<Session>) -> Result<()> {
+async fn create_user_credentials_table(session: &Arc<Session>) -> Result<(), QueryError> {
     //"CREATE TABLE IF NOT EXISTS user_data.user_credentials ( userid UUID PRIMARY KEY, password text, email text)
     let create_table_cql =
         //"ALTER TABLE user_data.user_credentials ADD active boolean";
@@ -123,7 +129,7 @@ async fn create_user_credentials_table(session: &Arc<Session>) -> Result<()> {
     Ok(())
 }
 
-async fn create_user_info_table(session: &Arc<Session>) -> Result<()> {
+async fn create_user_info_table(session: &Arc<Session>) -> Result<(), QueryError> {
     // "CREATE TABLE IF NOT EXISTS user_data.user_info ( userid UUID PRIMARY KEY, lastname text, firstname text, email text, created_date timestamp, modified_date timestamp, active boolean)
     let create_table_cql =
         //"ALTER TABLE user_data.user_info  

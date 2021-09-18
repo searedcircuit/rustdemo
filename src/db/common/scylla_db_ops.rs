@@ -5,7 +5,6 @@ use scylla::load_balancing::TokenAwarePolicy;
 use scylla::transport::errors::NewSessionError;
 use std::sync::Arc;
 
-use anyhow::Result;
 use scylla::transport::session::Session;
 use scylla::SessionBuilder;
 

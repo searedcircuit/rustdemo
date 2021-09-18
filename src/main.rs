@@ -1,3 +1,5 @@
+use std::error::Error;
+use std::result::Result;
 use actix_web::{web,App,HttpServer};
 
 pub mod auth{
@@ -34,49 +36,47 @@ pub mod db{
     pub mod common{
         mod scylla_db_ops;
         pub use scylla_db_ops::create_session;
-    }
+    }    
     pub mod user{
         mod scylla_user_db_ops;
         pub use scylla_user_db_ops::create_all as user_create_all;
         pub use scylla_user_db_ops::insert_user;
         pub use scylla_user_db_ops::select_user;
         pub use scylla_user_db_ops::user_login;
-    }
-    pub mod store{
-        mod scylla_store_db_ops;
-        pub use scylla_store_db_ops::create_all as store_create_all;
-        pub use scylla_store_db_ops::insert_store_user;
-        pub use scylla_store_db_ops::select_store_user;
+
+        mod scylla_activate_user_db_ops;
+        pub use scylla_activate_user_db_ops::activate_user;
     }
 }
 pub mod handlers{
     mod user_handler;
-    mod store_user_handler;
+    mod activation_handler;
 
     pub use user_handler::{create as user_create,get as user_get,login as user_login};    
-    pub use store_user_handler::{create as store_create, get as store_get}; 
+    pub use activation_handler::{activate as activate_user};
+    
 }
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    let create_session_result = db::common::create_session().await;
-    if let Ok(pool) = create_session_result {
-        let _created_userinfo = db::user::user_create_all(&pool.clone()).await;
-        let _created_storeinfo = db::store::store_create_all(&pool.clone()).await;
-        println!("db connect complete");
-       HttpServer::new(move|| App::new()
-       .service(handlers::user_create).app_data(web::Data::new(pool.clone()))
-       .service(handlers::user_get).app_data(web::Data::new(pool.clone()))
-       .service(handlers::user_login).app_data(web::Data::new(pool.clone()))
-       
-       .service(handlers::store_create).app_data(web::Data::new(pool.clone()))
-       .service(handlers::store_get).app_data(web::Data::new(pool.clone()))
-    )
-           .bind("0.0.0.0:8081")?
-           .run()
-           .await?;
-    } else {
-        panic!("error connecting")
+    let res = db::common::create_session().await;
+    match res {
+        Ok(pool) => {
+            let _created_userinfo = db::user::user_create_all(&pool.clone()).await;
+            println!("db connect complete");
+            
+            let _srv = HttpServer::new(move|| App::new()
+               .service(handlers::user_create).app_data(web::Data::new(pool.clone()))
+               .service(handlers::activate_user).app_data(web::Data::new(pool.clone()))
+
+               .service(handlers::user_get).app_data(web::Data::new(pool.clone()))
+               .service(handlers::user_login).app_data(web::Data::new(pool.clone()))
+            )
+            .bind("0.0.0.0:8081")?
+            .run()
+            .await;
+        }
+        Err(e) => panic!("error connecting {}",e)
     }
     Ok(())
 }
