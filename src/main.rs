@@ -45,6 +45,7 @@ pub mod db{
         pub use scylla_user_db_ops::user_login;
 
         mod scylla_activate_user_db_ops;
+        pub use scylla_activate_user_db_ops::create_all as activation_create_all;
         pub use scylla_activate_user_db_ops::activate_user;
     }
 }
@@ -62,7 +63,8 @@ async fn main() -> std::io::Result<()> {
     let res = db::common::create_session().await;
     match res {
         Ok(pool) => {
-            let _created_userinfo = db::user::user_create_all(&pool.clone()).await;
+            let _created_userinfo = db::user::user_create_all(&pool.clone()).await.expect("user table creation failed.");
+            let _created_activation= db::user::activation_create_all(&pool.clone()).await.expect("activate table creation failed");
             println!("db connect complete");
             
             let _srv = HttpServer::new(move|| App::new()

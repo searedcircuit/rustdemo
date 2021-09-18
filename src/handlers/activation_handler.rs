@@ -6,7 +6,7 @@ use scylla::Session;
 
 use crate::db::user::activate_user;
 
-#[post("/user/activate/{}")]
+#[post("/user/activate/{web_activation_code}")]
 pub async fn activate(pool: web::Data<Arc<Session>>,web_activation_code: web::Path<Uuid>) -> Result<HttpResponse> {
     let poolconn = pool.get_ref();
     let activation_code = web_activation_code.into_inner();
@@ -18,6 +18,6 @@ pub async fn activate(pool: web::Data<Arc<Session>>,web_activation_code: web::Pa
         Err(err) => 
             Ok(HttpResponse::BadRequest()
             .content_type("application/json")
-            .body(format!(r#"{{"error":"{}"}}"#, err)))
+            .body(format!(r#"{{"error":"{}"}}"#, err.to_string())))
     }
 }

@@ -15,10 +15,12 @@ use crate::data::{
     }
 };
 
+const ACTIVATION_TTL: i32 = 86400;
+
 const KS_NAME: &str = "user_data";
 const USER_TAB_NAME: &str = "user_info";
+const ACTIVATION_TAB_NAME: &str = "user_activation";
 const USER_CREDS_TAB_NAME: &str = "user_credentials";
-const USER_ACTIVATION_TAB_NAME: &str = "user_activation";
 
 const USER_ID: &str = "userid";
 const USER_EMAIL: &str = "email";
@@ -37,7 +39,7 @@ pub async fn insert_user(session: &Arc<Session>, user: &CreateUserRequest) -> Re
         (userid, email, password, active) VALUES (?, ?, ?, ?)",KS_NAME,USER_CREDS_TAB_NAME);
 
     let insert_activation_code_cql: String = format!("INSERT INTO {}.{} 
-        (activation_code, userid) VALUES (?, ?)",KS_NAME,USER_ACTIVATION_TAB_NAME);
+        (activation_code, userid, email) VALUES (?, ?, ?) USING TTL {}",KS_NAME,ACTIVATION_TAB_NAME,ACTIVATION_TTL);
 
     let now = Utc::now();
     let created = Duration::seconds(now.timestamp());
@@ -48,11 +50,11 @@ pub async fn insert_user(session: &Arc<Session>, user: &CreateUserRequest) -> Re
     let creds_future = session
         .query(insert_user_creds_cql, (userid, &user.email, &user.password_hash, false));
     let activation_future = session
-        .query(insert_activation_code_cql, (activation_code, userid));        
+        .query(insert_activation_code_cql, (activation_code, userid, &user.email));        
 
-    try_join!(info_future,creds_future,activation_future);
+    try_join!(info_future,creds_future,activation_future)?;
 
-    Ok(userid)
+    Ok(activation_code)
 }
 
 pub async fn user_login(session: &Arc<Session>, login_request: &UserLoginRequest)-> Result<uuid::Uuid,String> {  
