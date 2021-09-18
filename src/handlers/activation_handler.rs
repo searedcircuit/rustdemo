@@ -21,3 +21,22 @@ pub async fn activate(pool: web::Data<Arc<Session>>,web_activation_code: web::Pa
             .body(format!(r#"{{"error":"{}"}}"#, err.to_string())))
     }
 }
+
+#[post("/user/reactivate/{web_email}")]
+pub async fn reactivate(pool: web::Data<Arc<Session>>,web_email: web::Path<String>) -> Result<HttpResponse> {
+    let poolconn = pool.get_ref();
+    let email = web_email.into_inner();
+
+    let user_res = scylla_user_db_ops::
+    let res = insert_activation_code(&poolconn, &email).await;
+    match res {
+        Ok(code) =>     
+            Ok(HttpResponse::Created()
+            .content_type("application/json")
+            .body(format!(r#"{{"activation_code":"{}"}}"#, code))),
+        Err(err) => 
+            Ok(HttpResponse::BadRequest()
+            .content_type("application/json")
+            .body(format!(r#"{{"error":"{}"}}"#, err.to_string())))
+    }
+}
