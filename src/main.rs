@@ -1,5 +1,3 @@
-use std::error::Error;
-use std::result::Result;
 use actix_web::{web,App,HttpServer};
 
 pub mod auth{
@@ -44,7 +42,7 @@ pub mod db{
         pub use scylla_user_db_ops::user_login;
 
         mod scylla_activate_user_db_ops;
-        pub use scylla_activate_user_db_ops::activate_user;
+        pub use scylla_activate_user_db_ops::{activate_user,insert_activation_code};
     }
 }
 pub mod handlers{
@@ -52,8 +50,7 @@ pub mod handlers{
     mod activation_handler;
 
     pub use user_handler::{create as user_create,get as user_get,login as user_login};    
-    pub use activation_handler::{activate as activate_user};
-    
+    pub use activation_handler::{activate as activate_user};    
 }
 
 #[actix_web::main]

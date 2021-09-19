@@ -4,7 +4,7 @@ use std::sync::Arc;
 use actix_web::{post, web, HttpResponse, Result, body};
 use scylla::Session;
 
-use crate::db::user::activate_user;
+use crate::db::user::{activate_user,insert_activation_code};
 
 #[post("/user/activate/{web_activation_code}")]
 pub async fn activate(pool: web::Data<Arc<Session>>,web_activation_code: web::Path<Uuid>) -> Result<HttpResponse> {
@@ -27,7 +27,6 @@ pub async fn reactivate(pool: web::Data<Arc<Session>>,web_email: web::Path<Strin
     let poolconn = pool.get_ref();
     let email = web_email.into_inner();
 
-    let user_res = scylla_user_db_ops::
     let res = insert_activation_code(&poolconn, &email).await;
     match res {
         Ok(code) =>     

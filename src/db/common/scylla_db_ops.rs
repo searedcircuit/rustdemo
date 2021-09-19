@@ -40,6 +40,16 @@ pub const USER_CREDS_INSERT: &str =
     ({USER_ID}, {USER_EMAIL}, {USER_PASSWORD_HASH}, {USER_IS_ACTIVE}) 
     VALUES (?, ?, ?, ?)");
 
+pub const USER_EMAIL_MAP_INSERT: &str = 
+    formatcp!("INSERT INTO {USER_KS_NAME}.{USER_EMAIL_MAP_TAB_NAME} 
+    ({USER_EMAIL}, {USER_ID}) 
+    VALUES (?, ?)");
+
+pub const USER_ACTIVATION_INSERT: &str = 
+    formatcp!("INSERT INTO {USER_KS_NAME}.{USER_ACTIVATION_TAB_NAME} 
+    ({USER_ACTIVATION_CODE}, {USER_ID}) 
+    VALUES (?, ?) USING TTL 86400");    
+
 // auth
 pub const AUTH_KS_NAME: &str = "session_auth_ks";
 
@@ -92,17 +102,17 @@ pub async fn create_tables(session: &Arc<Session>) -> Result<(),QueryError> {
     create_auth_ks(session).await?;
 
     create_user_info(session).await?;
-    // create user_info
-    // create user_creds
-    // create email_map
-    // create activation
-    // create auth_token
-    // create refresh_token
+    create_user_creds(session).await?;
+    create_email_map(session).await?;
+    create_activation(session).await?;
+    create_auth_token(session).await?;
+    create_refresh_token(session).await?;
+    
     Ok(())
 }
 
 async fn create_user_ks(session: &Arc<Session>) -> Result<(), QueryError> {
-    let create_user_ks: &'static str = format!("CREATE KEYSPACE IF NOT EXISTS {} WITH replication = {{'class':'NetworkTopologyStrategy','datacenter1':1, 'replication_factor' : 3}};",USER_KS_NAME);
+    let create_user_ks: &str = formatcp!("CREATE KEYSPACE IF NOT EXISTS {USER_KS_NAME} WITH replication = {{'class':'NetworkTopologyStrategy','datacenter1':1, 'replication_factor' : 3}};");
     session
         .query(create_user_ks,&[])
         .await?;
@@ -110,15 +120,12 @@ async fn create_user_ks(session: &Arc<Session>) -> Result<(), QueryError> {
 }
 
 async fn create_auth_ks(session: &Arc<Session>) -> Result<(), QueryError> {
-    let create_auth_ks: &'static str = format!("CREATE KEYSPACE IF NOT EXISTS {} WITH replication = {{'class':'NetworkTopologyStrategy','datacenter1':1, 'replication_factor' : 3}};",AUTH_KS_NAME);
+    let create_auth_ks: &str = formatcp!("CREATE KEYSPACE IF NOT EXISTS {AUTH_KS_NAME} WITH replication = {{'class':'NetworkTopologyStrategy','datacenter1':1, 'replication_factor' : 3}};");
     session
         .query(create_auth_ks,&[])
         .await?;
     Ok(())
 }
-
-
-
 
 async fn create_user_info(session: &Arc<Session>) -> Result<(), QueryError> {
     let create_user_info_table_cql = 
@@ -141,21 +148,13 @@ async fn create_user_info(session: &Arc<Session>) -> Result<(), QueryError> {
 }
 
 async fn create_user_creds(session: &Arc<Session>) -> Result<(), QueryError> {
-    let create_user_creds_table_cql = format!("CREATE TABLE IF NOT EXISTS {}.{} 
+    let create_user_creds_table_cql = formatcp!("CREATE TABLE IF NOT EXISTS {USER_KS_NAME}.{USER_CREDS_TAB_NAME} 
         ( 
-            {} UUID PRIMARY KEY, 
-            {} text, 
-            {} text, 
-            {} boolean
-        )",
-        USER_KS_NAME,
-        USER_CREDS_TAB_NAME,
-        USER_ID,
-
-        USER_EMAIL,
-        USER_PASSWORD_HASH,
-        USER_IS_ACTIVE
-    );
+            {USER_ID} UUID PRIMARY KEY, 
+            {USER_EMAIL} text, 
+            {USER_PASSWORD_HASH} text, 
+            {USER_IS_ACTIVE} boolean
+        )");
 
     session
         .query(create_user_creds_table_cql,&[])
@@ -164,17 +163,11 @@ async fn create_user_creds(session: &Arc<Session>) -> Result<(), QueryError> {
 }
 
 async fn create_email_map(session: &Arc<Session>) -> Result<(), QueryError> {
-    let create_user_email_map_table_cql = format!("CREATE TABLE IF NOT EXISTS {}.{} 
+    let create_user_email_map_table_cql = formatcp!("CREATE TABLE IF NOT EXISTS {USER_KS_NAME}.{USER_EMAIL_MAP_TAB_NAME} 
         ( 
-            {} text PRIMARY KEY, 
-            {} UUID
-        )",
-        USER_KS_NAME,
-        USER_EMAIL_MAP_TAB_NAME,
-        USER_EMAIL,
-
-        USER_ID
-    );
+            {USER_EMAIL} text PRIMARY KEY, 
+            {USER_ID} UUID
+        )");
 
     session
         .query(create_user_email_map_table_cql,&[])
@@ -183,17 +176,11 @@ async fn create_email_map(session: &Arc<Session>) -> Result<(), QueryError> {
 }
 
 async fn create_activation(session: &Arc<Session>) -> Result<(), QueryError> {
-    let create_user_activation_table_cql = format!("CREATE TABLE IF NOT EXISTS {}.{} 
+    let create_user_activation_table_cql = formatcp!("CREATE TABLE IF NOT EXISTS {USER_KS_NAME}.{USER_ACTIVATION_TAB_NAME} 
         ( 
-            {} UUID PRIMARY KEY, 
-            {} UUID
-        )",
-        USER_KS_NAME,
-        USER_ACTIVATION_TAB_NAME,
-        USER_ACTIVATION_CODE,
-
-        USER_ID
-    );
+            {USER_ACTIVATION_CODE} UUID PRIMARY KEY, 
+            {USER_ID} UUID
+        )");
 
     session
         .query(create_user_activation_table_cql,&[])
@@ -202,17 +189,11 @@ async fn create_activation(session: &Arc<Session>) -> Result<(), QueryError> {
 }
 
 async fn create_auth_token(session: &Arc<Session>) -> Result<(), QueryError> {
-    let create_auth_token_table_cql = format!("CREATE TABLE IF NOT EXISTS {}.{} 
+    let create_auth_token_table_cql = formatcp!("CREATE TABLE IF NOT EXISTS {AUTH_KS_NAME}.{AUTH_TOKEN_TAB_NAME} 
         ( 
-            {} UUID PRIMARY KEY, 
-            {} UUID
-        )",
-        AUTH_KS_NAME,
-        AUTH_TOKEN_TAB_NAME,
-        AUTH_TOKEN,
-
-        USER_ID
-    );
+            {AUTH_TOKEN} UUID PRIMARY KEY, 
+            {USER_ID} UUID
+        )");
 
     session
         .query(create_auth_token_table_cql,&[])
@@ -221,17 +202,11 @@ async fn create_auth_token(session: &Arc<Session>) -> Result<(), QueryError> {
 }
 
 async fn create_refresh_token(session: &Arc<Session>) -> Result<(), QueryError> {
-    let create_auth_refresh_token_table_cql = format!("CREATE TABLE IF NOT EXISTS {}.{} 
+    let create_auth_refresh_token_table_cql = formatcp!("CREATE TABLE IF NOT EXISTS {AUTH_KS_NAME}.{AUTH_REFRESH_TAB_NAME} 
         ( 
-            {} UUID PRIMARY KEY, 
-            {} UUID
-        )",
-        AUTH_KS_NAME,
-        AUTH_REFRESH_TAB_NAME,
-        REFRESH_TOKEN,
-
-        USER_ID
-    );
+            {REFRESH_TOKEN} UUID PRIMARY KEY, 
+            {USER_ID} UUID
+        )");
 
     session
         .query(create_auth_refresh_token_table_cql,&[])
