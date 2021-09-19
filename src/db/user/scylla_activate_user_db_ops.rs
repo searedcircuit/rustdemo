@@ -8,18 +8,6 @@ use std::sync::Arc;
 
 use scylla::transport::session::{IntoTypedRows, Session};
 
-const KS_NAME: &str = "user_data";
-const ACTIVATION_TAB_NAME: &str = "user_activation";
-const USER_TAB_NAME: &str = "user_info";
-const USER_CREDS_TAB_NAME: &str = "user_credentials";
-
-const ACTIVATION_CODE: &str = "activation_code";
-const USER_ID: &str = "userid";
-const USER_EMAIL: &str = "email";
-const USER_IS_ACTIVE: &str = "active";
-
-const MODIFIED_DATE: &str = "modified_date";
-
 pub async fn activate_user(session: &Arc<Session>, activation_code: &Uuid) -> Result<(),Box<dyn std::error::Error>> {
     let get_userid_cql: String = format!("SELECT {},{} FROM {}.{} WHERE {} = {} LIMIT 1",
         USER_ID,
