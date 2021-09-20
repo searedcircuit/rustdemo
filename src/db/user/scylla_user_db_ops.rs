@@ -25,12 +25,14 @@ use crate::db::common::{
     USER_INFO_INSERT, 
     USER_IS_ACTIVE, 
     USER_KS_NAME};
+use crate::db::auth::get_auth_codes;
 use crate::data::{
     db::DbUserInfo, 
     request::{
         auth::UserLoginRequest, 
         user::create_user_request::CreateUserRequest
-    }
+    },
+    response::UserLoginResponse
 };
 
 pub async fn insert_user(session: &Arc<Session>, user: &CreateUserRequest) -> Result<uuid::Uuid, QueryError> {
@@ -60,7 +62,7 @@ pub async fn insert_user(session: &Arc<Session>, user: &CreateUserRequest) -> Re
     Ok(activation_code)
 }
 
-pub async fn user_login(session: &Arc<Session>, login_request: &UserLoginRequest)-> Result<uuid::Uuid,Box<dyn std::error::Error>> {  
+pub async fn user_login(session: &Arc<Session>, login_request: &UserLoginRequest)-> Result<UserLoginResponse,Box<dyn std::error::Error>> {  
     let mut email = String::new();
     let mut pass = String::new();
     match &login_request.email {
@@ -74,7 +76,8 @@ pub async fn user_login(session: &Arc<Session>, login_request: &UserLoginRequest
 
     let select_user_id_cql: &str = formatcp!("SELECT {USER_ID} FROM {USER_KS_NAME}.{USER_EMAIL_MAP_TAB_NAME} WHERE {USER_EMAIL} = ? LIMIT 1");
     let mut userid = uuid::Uuid::default();
-    if let Some(rows) = session.query(select_user_id_cql,(email,)).await?.rows{
+    let res = session.query(select_user_id_cql,(email,)).await?.rows;
+    if let Some(rows) = res{
         for row in rows.into_typed::<(uuid::Uuid,)>() {
             match row {
                 Ok(r) => {
@@ -88,16 +91,21 @@ pub async fn user_login(session: &Arc<Session>, login_request: &UserLoginRequest
         }
     }
 
+    if userid == uuid::Uuid::default(){
+        return Err("Error locating user info. Does this account exist?".into())
+    }
+
     let select_user_login_cql: &str = formatcp!("SELECT {USER_PASSWORD_HASH}, {USER_IS_ACTIVE} FROM {USER_KS_NAME}.{USER_CREDS_TAB_NAME} WHERE {USER_ID} = ? LIMIT 1");
 
-    if let Some(rows) = session.query(select_user_login_cql,(userid,)).await?.rows{
+    let res = session.query(select_user_login_cql,(userid,)).await?.rows;
+    let mut rowpass = String::new();
+    let mut rowactive = false;
+    if let Some(rows) = res {
         for row in rows.into_typed::<(String,bool)>() {
             match row {
                 Ok(r) => {
-                    let password = r.0;
-                    let active = r.1;
-                    if !active{return Err("account is not activated".into());}
-                    if !password.eq(&pass){return Err("invalid login".into());}
+                    rowpass = r.0;
+                    rowactive = r.1;
                 }
                 Err(e) => {
                     // log e
@@ -107,7 +115,12 @@ pub async fn user_login(session: &Arc<Session>, login_request: &UserLoginRequest
         }
     }
 
-    Ok(userid)
+    if !rowpass.eq(&pass) || rowpass.eq(&String::new()) {return Err("invalid login".into());}
+    if !rowactive{return Err("account is not activated".into());}
+
+    let codes = get_auth_codes(session,userid).await?;
+
+    Ok(codes)
 }
 
 pub async fn select_user(session: &Arc<Session>, userid: uuid::Uuid)-> Result<DbUserInfo,QueryError> {  

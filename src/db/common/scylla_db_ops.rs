@@ -53,22 +53,22 @@ pub const USER_ACTIVATION_INSERT: &str =
 // auth
 pub const AUTH_KS_NAME: &str = "session_auth_ks";
 
-pub const AUTH_TOKEN_TAB_NAME: &str = "auth_token";
-pub const AUTH_REFRESH_TAB_NAME: &str = "refresh_token";
+pub const AUTH_CODE_TAB_NAME: &str = "auth_code";
+pub const AUTH_REFRESH_TAB_NAME: &str = "refresh_code";
 
-pub const AUTH_TOKEN: &str = "auth_token";
-pub const REFRESH_TOKEN: &str = "refresh_token";
+pub const AUTH_CODE: &str = "auth_code";
+pub const REFRESH_CODE: &str = "refresh_code";
 
-pub const AUTH_TOKEN_TTL: i32 = 3600;
+pub const AUTH_CODE_TTL: i32 = 3600;
 pub const AUTH_REFRESH_TTL: i32 = 2_592_000;
 
-pub const AUTH_TOKEN_INSERT: &str = 
-    formatcp!("INSERT INTO {AUTH_KS_NAME}.{AUTH_TOKEN_TAB_NAME} ({AUTH_TOKEN}, {USER_ID}) VALUES (?, ?)");
+pub const AUTH_CODE_INSERT: &str = 
+    formatcp!("INSERT INTO {AUTH_KS_NAME}.{AUTH_CODE_TAB_NAME} ({AUTH_CODE}, {USER_ID}) VALUES (?, ?)");
 
-pub const AUTH_REFRESH_TOKEN_INSERT: &str = 
-    formatcp!("INSERT INTO {AUTH_KS_NAME}.{AUTH_REFRESH_TAB_NAME} ({REFRESH_TOKEN}, {USER_ID}) VALUES (?, ?)");
+pub const AUTH_REFRESH_CODE_INSERT: &str = 
+    formatcp!("INSERT INTO {AUTH_KS_NAME}.{AUTH_REFRESH_TAB_NAME} ({REFRESH_CODE}, {USER_ID}) VALUES (?, ?)");
 
-const ADDRESS: &str = "cassandra:9042";
+const ADDRESS: &str = "localhost:9042";
 
 pub async fn create_session() -> Result<Arc<Session>,NewSessionError> {
     //let uri = env::var("cassandra:9042").unwrap_or_else(|_| "127.0.0.1:9042".to_string());
@@ -105,8 +105,8 @@ pub async fn create_tables(session: &Arc<Session>) -> Result<(),QueryError> {
     create_user_creds(session).await?;
     create_email_map(session).await?;
     create_activation(session).await?;
-    create_auth_token(session).await?;
-    create_refresh_token(session).await?;
+    create_auth_code(session).await?;
+    create_refresh_code(session).await?;
     
     Ok(())
 }
@@ -188,28 +188,28 @@ async fn create_activation(session: &Arc<Session>) -> Result<(), QueryError> {
     Ok(())    
 }
 
-async fn create_auth_token(session: &Arc<Session>) -> Result<(), QueryError> {
-    let create_auth_token_table_cql = formatcp!("CREATE TABLE IF NOT EXISTS {AUTH_KS_NAME}.{AUTH_TOKEN_TAB_NAME} 
+async fn create_auth_code(session: &Arc<Session>) -> Result<(), QueryError> {
+    let create_auth_code_table_cql = formatcp!("CREATE TABLE IF NOT EXISTS {AUTH_KS_NAME}.{AUTH_CODE_TAB_NAME} 
         ( 
-            {AUTH_TOKEN} UUID PRIMARY KEY, 
+            {AUTH_CODE} UUID PRIMARY KEY, 
             {USER_ID} UUID
         )");
 
     session
-        .query(create_auth_token_table_cql,&[])
+        .query(create_auth_code_table_cql,&[])
         .await?;
     Ok(())      
 }
 
-async fn create_refresh_token(session: &Arc<Session>) -> Result<(), QueryError> {
-    let create_auth_refresh_token_table_cql = formatcp!("CREATE TABLE IF NOT EXISTS {AUTH_KS_NAME}.{AUTH_REFRESH_TAB_NAME} 
+async fn create_refresh_code(session: &Arc<Session>) -> Result<(), QueryError> {
+    let create_auth_refresh_code_table_cql = formatcp!("CREATE TABLE IF NOT EXISTS {AUTH_KS_NAME}.{AUTH_REFRESH_TAB_NAME} 
         ( 
-            {REFRESH_TOKEN} UUID PRIMARY KEY, 
+            {REFRESH_CODE} UUID PRIMARY KEY, 
             {USER_ID} UUID
         )");
 
     session
-        .query(create_auth_refresh_token_table_cql,&[])
+        .query(create_auth_refresh_code_table_cql,&[])
         .await?;
     Ok(())      
 }

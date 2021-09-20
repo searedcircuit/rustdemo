@@ -31,6 +31,10 @@ pub mod data{
     }
 }
 pub mod db{
+    pub mod auth{
+        mod scylla_auth_db_ops;
+        pub use scylla_auth_db_ops::get_auth_codes;
+    }
     pub mod common{
         mod scylla_db_ops;
         pub use scylla_db_ops::*;

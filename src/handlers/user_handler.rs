@@ -32,10 +32,8 @@ async fn login(pool: web::Data<Arc<Session>>,login_content: web::Json<UserLoginR
 
     let res = user_login(poolconn,&login).await;
     match res {
-        Ok(userid)=>
-            Ok(HttpResponse::Ok()
-            .content_type("application/json")
-            .body(format!(r#"{{"userid":"{}"}}"#, userid))),
+        Ok(login_resp)=>
+            Ok(HttpResponse::Ok().json(login_resp)),
         Err(e) => 
             Ok(HttpResponse::BadRequest()
             .content_type("application/json")
