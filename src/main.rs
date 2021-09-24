@@ -14,8 +14,8 @@ pub mod data{
             pub use login_request::UserLoginRequest;
         }
         pub mod store{
-            pub mod create_store_user_request;
-            pub use create_store_user_request::CreateStoreUserRequest;
+            pub mod create_store_request;
+            pub use create_store_request::CreateStoreRequest;
         }
         pub mod user{
             pub mod create_user_request;
@@ -23,11 +23,17 @@ pub mod data{
         }
     }
     pub mod response{
-        pub mod create_user_response;
-        pub mod login_response;
+        pub mod user{
+            pub mod create_user_response;
+            pub mod login_response;
 
-        pub use create_user_response::CreateUserResponse;
-        pub use login_response::UserLoginResponse;
+            pub use create_user_response::CreateUserResponse;
+            pub use login_response::UserLoginResponse;
+        }
+        pub mod store{
+            pub mod get_store_response;
+            pub use get_store_response::StoreResponse;
+        }
     }
 }
 pub mod db{
@@ -48,13 +54,20 @@ pub mod db{
         mod scylla_activate_user_db_ops;
         pub use scylla_activate_user_db_ops::{activate_user,insert_activation_code};
     }
+    pub mod store{
+        mod scylla_store_db_ops;
+        pub use scylla_store_db_ops::{insert_store,select_stores};
+
+    }
 }
 pub mod handlers{
     mod user_handler;
     mod activation_handler;
+    mod store_handler;
 
-    pub use user_handler::{create as user_create,get as user_get,login as user_login};    
-    pub use activation_handler::{activate as activate_user};    
+    pub use user_handler::{create as user_create,get as user_get,login as user_login};   
+    pub use activation_handler::{activate as activate_user};  
+    pub use store_handler::{create as store_create,get as store_get};   
 }
 
 #[actix_web::main]

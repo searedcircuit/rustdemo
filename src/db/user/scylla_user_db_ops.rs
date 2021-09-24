@@ -8,6 +8,7 @@ use std::sync::Arc;
 use scylla::frame::value::Timestamp;
 use scylla::transport::session::{IntoTypedRows, Session};
 
+use crate::data::response::user::UserLoginResponse;
 use crate::db::common::{
     CREATED_DATE, 
     MODIFIED_DATE, 
@@ -32,7 +33,6 @@ use crate::data::{
         auth::UserLoginRequest, 
         user::create_user_request::CreateUserRequest
     },
-    response::UserLoginResponse
 };
 
 pub async fn insert_user(session: &Arc<Session>, user: &CreateUserRequest) -> Result<uuid::Uuid, QueryError> {

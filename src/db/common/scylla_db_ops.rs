@@ -68,6 +68,39 @@ pub const AUTH_CODE_INSERT: &str =
 pub const AUTH_REFRESH_CODE_INSERT: &str = 
     formatcp!("INSERT INTO {AUTH_KS_NAME}.{AUTH_REFRESH_TAB_NAME} ({REFRESH_CODE}, {USER_ID}) VALUES (?, ?)");
 
+// store
+pub const STORE_KS_NAME: &str = "store_ks";
+
+pub const STORE_INFO_TAB_NAME: &str = "store_info";
+
+pub const STORE_ID: &str = "store_id";
+pub const PLACE_ID: &str = "place_id";
+pub const STORE_NAME: &str = "store_name";
+pub const STORE_DESCRIPTION: &str = "store_desc";
+pub const FORMATTED_ADDRESS: &str = "formatted_addr";
+pub const LATITUDE: &str = "lat";
+pub const LONGITUDE: &str = "lng";
+pub const SHORT_LAT: &str = "slat";
+pub const SHORT_LNG: &str = "slng";
+
+pub const STORE_INFO_INSERT: &str = 
+    formatcp!("INSERT INTO 
+        {STORE_KS_NAME}.{STORE_INFO_TAB_NAME} 
+        (
+            {STORE_ID},
+            {PLACE_ID},
+            {STORE_NAME},
+            {STORE_DESCRIPTION},
+            {FORMATTED_ADDRESS},
+            {LATITUDE},
+            {LONGITUDE},
+            {SHORT_LAT},            
+            {SHORT_LNG},
+            {CREATED_DATE},
+            {MODIFIED_DATE}
+        ) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+
 const ADDRESS: &str = "localhost:9042";
 
 pub async fn create_session() -> Result<Arc<Session>,NewSessionError> {
@@ -212,4 +245,28 @@ async fn create_refresh_code(session: &Arc<Session>) -> Result<(), QueryError> {
         .query(create_auth_refresh_code_table_cql,&[])
         .await?;
     Ok(())      
+}
+
+async fn create_store(session: &Arc<Session>) -> Result<(), QueryError> {
+    let create_user_info_table_cql = 
+        formatcp!(
+        "CREATE TABLE IF NOT EXISTS {USER_KS_NAME}.{STORE_INFO_TAB_NAME} 
+        ( 
+            {STORE_ID} UUID,
+            {PLACE_ID} text,
+            {STORE_NAME} text,
+            {STORE_DESCRIPTION} text,
+            {FORMATTED_ADDRESS} text,
+            {LATITUDE} double,
+            {LONGITUDE} double,
+            {SHORT_LAT} float,
+            {SHORT_LNG} float,
+            {CREATED_DATE} timestamp,
+            {MODIFIED_DATE} timestamp
+        )");
+
+    session
+        .query(create_user_info_table_cql,&[])
+        .await?;
+    Ok(())
 }

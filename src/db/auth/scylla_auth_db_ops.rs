@@ -2,8 +2,12 @@ use std::sync::Arc;
 
 use scylla::transport::session::Session;
 
-use crate::data::response::UserLoginResponse;
-use crate::db::common::{AUTH_CODE_INSERT, AUTH_REFRESH_CODE_INSERT};
+
+use crate::{
+    data::response::user::UserLoginResponse, 
+    db::common::{AUTH_CODE_INSERT, AUTH_REFRESH_CODE_INSERT
+    }
+};
 
 pub async fn get_auth_codes(session: &Arc<Session>, userid: uuid::Uuid) -> Result<UserLoginResponse,Box<dyn std::error::Error>> {
     let access_code = uuid::Uuid::new_v4();
