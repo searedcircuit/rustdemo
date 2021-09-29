@@ -1,7 +1,5 @@
 use const_format::formatcp;
-use chrono::prelude::*;
 use chrono::{Utc,Duration};
-use tokio::try_join;
 use scylla::transport::errors::QueryError;
 use std::sync::Arc;
 
@@ -9,70 +7,104 @@ use scylla::frame::value::Timestamp;
 use scylla::transport::session::{IntoTypedRows, Session};
 
 use crate::db::common::{
-    CREATED_DATE, 
-    MODIFIED_DATE, 
-    USER_ACTIVATION_INSERT, 
-    USER_CREDS_INSERT, 
-    USER_INFO_TAB_NAME, 
-    USER_EMAIL_MAP_TAB_NAME,
-    USER_CREDS_TAB_NAME, 
-    USER_EMAIL,
-    USER_FIRSTNAME,
-    USER_LASTNAME, 
-    USER_PASSWORD_HASH, 
-    USER_EMAIL_MAP_INSERT, 
-    USER_ID, 
-    USER_INFO_INSERT, 
-    USER_IS_ACTIVE, 
-    USER_KS_NAME};
+    STORE_KS_NAME,
+    STORE_INFO_TAB_NAME,
+    STORE_NAME,
+    STORE_DESCRIPTION,
+    FORMATTED_ADDRESS,
+    STORE_ID,
+    PLACE_ID,
+    LATITUDE,
+    LONGITUDE,
+    SHORT_LAT,
+    SHORT_LNG,
+    STORE_IS_ACTIVE,
+    STORE_INFO_INSERT};
 use crate::data::{    
     response::store::get_store_response::StoreResponse,
     request::store::create_store_request::CreateStoreRequest,    
 };
 
-pub async fn insert_store(session: &Arc<Session>, user: &CreateStoreRequest) -> Result<uuid::Uuid, QueryError> {
-    let userid = uuid::Uuid::new_v4();
-    let activation_code = uuid::Uuid::new_v4();
+pub async fn insert_store(session: &Arc<Session>, store: &CreateStoreRequest) -> Result<(), QueryError> {
+    let store_id = uuid::Uuid::new_v4();
 
     let now = Utc::now();
     let created = Duration::seconds(now.timestamp());
     let modified = Duration::seconds(now.timestamp());
+    let slat = store.lat.unwrap() as i8;
+    let slng = store.lng.unwrap() as i8;
 
-    // insert user info
-    // insert user creds
-    // insert user email map
-    // insert user activation code
-
-    let info_future = session
-        .query(USER_INFO_INSERT, (userid, &user.email, &user.firstname, &user.lastname, false, Timestamp(created), Timestamp(modified)));
-    let creds_future = session
-        .query(USER_CREDS_INSERT, (userid, &user.email, &user.password_hash, false));
-    let email_map_future = session
-        .query(USER_EMAIL_MAP_INSERT, (&user.email, userid));        
-    let activation_future = session
-        .query(USER_ACTIVATION_INSERT, (activation_code, userid));        
-
-    try_join!(info_future,creds_future,email_map_future,activation_future)?;
-
-    Ok(activation_code)
+    session
+        .query(STORE_INFO_INSERT, 
+        (store_id,
+                &store.place_id,
+                &store.name,
+                &store.description,
+                &store.formatted_address,
+                store.lat,
+                store.lng,
+                slat,
+                slng,
+                store.active,
+                Timestamp(created),
+                Timestamp(modified))).await?;
+    Ok(())
 }
 
-pub async fn select_stores(session: &Arc<Session>, userlat: f64,userlng: f64)-> Result<Vec<StoreResponse>,QueryError> {  
-    let select_store_struct_cql: &str = formatcp!("SELECT {USER_ID}, {USER_EMAIL}, {USER_FIRSTNAME}, {USER_LASTNAME}, {CREATED_DATE}, {MODIFIED_DATE}, {USER_IS_ACTIVE} FROM {USER_KS_NAME}.{USER_INFO_TAB_NAME} WHERE userid = ? LIMIT 1");  
-    
+pub async fn select_stores(session: &Arc<Session>, userlat: f64,userlng: f64)-> Result<Vec<StoreResponse>,Box<dyn std::error::Error>> {  
+    let slat = userlat as i8;
+    let slng = userlng as i8;
+
+    let select_store_struct_cql: &str = formatcp!(
+        "SELECT 
+        
+        {STORE_ID}, 
+        {PLACE_ID}, 
+        {STORE_NAME}, 
+        {STORE_DESCRIPTION}, 
+        {FORMATTED_ADDRESS}, 
+        {LATITUDE}, 
+        {LONGITUDE},
+        {SHORT_LAT},
+        {SHORT_LNG},
+        {STORE_IS_ACTIVE} 
+
+        FROM {STORE_KS_NAME}.{STORE_INFO_TAB_NAME}         
+
+        WHERE {SHORT_LAT} IN (?,?,?) 
+        AND {SHORT_LNG} IN (?,?,?) 
+        AND ({LATITUDE},{LONGITUDE}) > (?,?)
+        AND ({LATITUDE},{LONGITUDE}) < (?,?)
+
+        LIMIT 20;");  
+
+    const RANGE:f64 = 0.1_f64;
+
     let mut stores: Vec<StoreResponse> = Vec::new();
-    if let Some(rows) = session.query(select_store_struct_cql,(userid,)).await?.rows {
-        for row in rows.into_typed::<(uuid::Uuid, String,String,String, Duration, Duration, bool)>() {
-            if let Ok(r) = row {
-                    my_row.userid = r.0;
-                    my_row.email = Some(r.1);
-                    my_row.firstname = Some(r.2);
-                    my_row.lastname = Some(r.3);
-                    my_row.created_date = Utc.timestamp(r.4.num_seconds(),0);
-                    my_row.modified_date = Utc.timestamp(r.5.num_seconds(),0);
-                    my_row.active = r.6;
+    if let Some(rows) = session.query(select_store_struct_cql,(slat-1,slat,slat+1,slng-1,slng,slng+1,userlat-RANGE,userlng-RANGE,userlat+RANGE,userlng+RANGE)).await?.rows {
+        for row in rows.into_typed::<(uuid::Uuid, String,String,String,String,f64,f64,i8,i8, bool)>() {
+            match row {
+                Ok(r) => {
+                    let store = StoreResponse{
+                        store_id: r.0,
+                        place_id: Some(r.1),
+                        name: Some(r.2),
+                        description: Some(r.3),
+                        formatted_address: Some(r.4),
+                        lat: Some(r.5),
+                        lng: Some(r.6),
+                        slat: Some(r.7),
+                        slng: Some(r.8),
+                        active:r.9
+                    };
+                    stores.push(store);
                 }
-            }
+                Err(e) => {
+                    // log e
+                    return Err(format!("Error locating stores. {}",e).into())
+                }
+            };
         }
-    Ok(my_row)
+    }
+    Ok(stores)
 }

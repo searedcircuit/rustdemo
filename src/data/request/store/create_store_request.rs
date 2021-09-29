@@ -8,6 +8,7 @@ pub struct CreateStoreRequest{
     pub description: Option<String>,    
     pub lat: Option<f64>,
     pub lng: Option<f64>,
+    pub active: bool,
 }
 
 impl Default for CreateStoreRequest {
@@ -19,6 +20,7 @@ impl Default for CreateStoreRequest {
             description: None,
             lat: None,
             lng: None,
+            active: false,
         }
     } 
 }

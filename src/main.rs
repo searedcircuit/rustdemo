@@ -81,9 +81,11 @@ async fn main() -> std::io::Result<()> {
             let _srv = HttpServer::new(move|| App::new()
                .service(handlers::user_create).app_data(web::Data::new(pool.clone()))
                .service(handlers::activate_user).app_data(web::Data::new(pool.clone()))
-
+               .service(handlers::store_create).app_data(web::Data::new(pool.clone()))
+               
                .service(handlers::user_get).app_data(web::Data::new(pool.clone()))
                .service(handlers::user_login).app_data(web::Data::new(pool.clone()))
+               .service(handlers::store_get).app_data(web::Data::new(pool.clone()))
             )
             .bind("0.0.0.0:8081")?
             .run()

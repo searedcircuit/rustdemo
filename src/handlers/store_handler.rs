@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use actix_web::{get,post, web,HttpResponse,Result};
+use actix_web::{HttpResponse, Result, body, get, post, web};
 use scylla::Session;
 
 use crate::{
@@ -16,10 +16,8 @@ let poolconn = pool.get_ref();
 
     let res = insert_store(&poolconn,&mut store).await;
     match res {
-        Ok(activation_code) =>     
-            Ok(HttpResponse::Ok()            
-            .content_type("application/json")
-            .body(format!(r#"{{"activation_code":"{}"}}"#, activation_code))),
+        Ok(()) =>     
+            Ok(HttpResponse::Created().body(body::Body::Empty)),
         Err(err) => 
             Ok(HttpResponse::BadRequest()
             .content_type("application/json")
@@ -27,7 +25,7 @@ let poolconn = pool.get_ref();
     }
 }
 
-#[get("/user/{id}")]
+#[get("/stores/find/{lat}/{lng}")]
 async fn get(pool: web::Data<Arc<Session>>,loc:web::Path<(f64,f64)>) -> Result<HttpResponse> {
     let poolconn = pool.get_ref();
     let (lat,lng) = loc.into_inner();

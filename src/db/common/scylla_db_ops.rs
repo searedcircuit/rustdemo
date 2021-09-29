@@ -1,3 +1,4 @@
+use futures::try_join;
 use scylla::transport::errors::QueryError;
 use std::time::{Duration as TimeDuration};
 use const_format::formatcp;
@@ -82,6 +83,7 @@ pub const LATITUDE: &str = "lat";
 pub const LONGITUDE: &str = "lng";
 pub const SHORT_LAT: &str = "slat";
 pub const SHORT_LNG: &str = "slng";
+pub const STORE_IS_ACTIVE: &str = "active";
 
 pub const STORE_INFO_INSERT: &str = 
     formatcp!("INSERT INTO 
@@ -96,10 +98,11 @@ pub const STORE_INFO_INSERT: &str =
             {LONGITUDE},
             {SHORT_LAT},            
             {SHORT_LNG},
+            {STORE_IS_ACTIVE},
             {CREATED_DATE},
             {MODIFIED_DATE}
         ) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
 const ADDRESS: &str = "localhost:9042";
 
@@ -133,13 +136,17 @@ pub async fn create_session() -> Result<Arc<Session>,NewSessionError> {
 pub async fn create_tables(session: &Arc<Session>) -> Result<(),QueryError> {
     create_user_ks(session).await?;
     create_auth_ks(session).await?;
+    create_store_ks(session).await?;
 
     create_user_info(session).await?;
     create_user_creds(session).await?;
     create_email_map(session).await?;
+
     create_activation(session).await?;
     create_auth_code(session).await?;
     create_refresh_code(session).await?;
+    
+    create_store(session).await?;
     
     Ok(())
 }
@@ -156,6 +163,14 @@ async fn create_auth_ks(session: &Arc<Session>) -> Result<(), QueryError> {
     let create_auth_ks: &str = formatcp!("CREATE KEYSPACE IF NOT EXISTS {AUTH_KS_NAME} WITH replication = {{'class':'NetworkTopologyStrategy','datacenter1':1, 'replication_factor' : 3}};");
     session
         .query(create_auth_ks,&[])
+        .await?;
+    Ok(())
+}
+
+async fn create_store_ks(session: &Arc<Session>) -> Result<(), QueryError> {
+    let create_store_ks: &str = formatcp!("CREATE KEYSPACE IF NOT EXISTS {STORE_KS_NAME} WITH replication = {{'class':'NetworkTopologyStrategy','datacenter1':1, 'replication_factor' : 3}};");
+    session
+        .query(create_store_ks,&[])
         .await?;
     Ok(())
 }
@@ -248,10 +263,10 @@ async fn create_refresh_code(session: &Arc<Session>) -> Result<(), QueryError> {
 }
 
 async fn create_store(session: &Arc<Session>) -> Result<(), QueryError> {
-    let create_user_info_table_cql = 
+    let create_store_info_table_cql = 
         formatcp!(
-        "CREATE TABLE IF NOT EXISTS {USER_KS_NAME}.{STORE_INFO_TAB_NAME} 
-        ( 
+        "CREATE TABLE IF NOT EXISTS {STORE_KS_NAME}.{STORE_INFO_TAB_NAME}
+        (
             {STORE_ID} UUID,
             {PLACE_ID} text,
             {STORE_NAME} text,
@@ -259,14 +274,16 @@ async fn create_store(session: &Arc<Session>) -> Result<(), QueryError> {
             {FORMATTED_ADDRESS} text,
             {LATITUDE} double,
             {LONGITUDE} double,
-            {SHORT_LAT} float,
-            {SHORT_LNG} float,
+            {SHORT_LAT} tinyint,
+            {SHORT_LNG} tinyint,
             {CREATED_DATE} timestamp,
-            {MODIFIED_DATE} timestamp
-        )");
+            {MODIFIED_DATE} timestamp,
+            {STORE_IS_ACTIVE} boolean,
+            PRIMARY KEY (({SHORT_LAT}, {SHORT_LNG}), {LATITUDE}, {LONGITUDE})
+        ) WITH CLUSTERING ORDER BY ({LATITUDE} ASC, {LONGITUDE} ASC);");
 
     session
-        .query(create_user_info_table_cql,&[])
-        .await?;
+        .query(create_store_info_table_cql,&[]).await?;
+    
     Ok(())
 }
