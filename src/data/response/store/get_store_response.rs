@@ -10,8 +10,8 @@ pub struct StoreResponse{
     pub description: Option<String>,    
     pub lat: Option<f64>,
     pub lng: Option<f64>,
-    pub slat: Option<i8>,
-    pub slng: Option<i8>,
+    pub slat: Option<i16>,
+    pub slng: Option<i16>,
     pub active: bool
 }
 

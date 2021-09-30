@@ -31,8 +31,8 @@ pub async fn insert_store(session: &Arc<Session>, store: &CreateStoreRequest) ->
     let now = Utc::now();
     let created = Duration::seconds(now.timestamp());
     let modified = Duration::seconds(now.timestamp());
-    let slat = store.lat.unwrap() as i8;
-    let slng = store.lng.unwrap() as i8;
+    let slat = f64::round(store.lat.unwrap() * 10.0) as i16;
+    let slng = f64::round(store.lng.unwrap() * 10.0) as i16;
 
     session
         .query(STORE_INFO_INSERT, 
@@ -51,9 +51,17 @@ pub async fn insert_store(session: &Arc<Session>, store: &CreateStoreRequest) ->
     Ok(())
 }
 
-pub async fn select_stores(session: &Arc<Session>, userlat: f64,userlng: f64)-> Result<Vec<StoreResponse>,Box<dyn std::error::Error>> {  
-    let slat = userlat as i8;
-    let slng = userlng as i8;
+pub async fn select_stores(session: &Arc<Session>, userlat: f64,userlng: f64)-> Result<Vec<StoreResponse>,Box<dyn std::error::Error>> {      
+    const RANGE:f64 = 0.1_f64;
+    
+    let slat = f64::round(userlat * 10.0) as i16;
+    let slng = f64::round(userlng * 10.0) as i16;
+    let slatmin = f64::round((userlat-RANGE) * 10.0) as i16;
+    let slngmin = f64::round((userlng-RANGE) * 10.0) as i16;
+    let slatmax = f64::round((userlat+RANGE) * 10.0) as i16;
+    let slngmax = f64::round((userlng+RANGE) * 10.0) as i16;
+    let (ulatmin,ulatmax,ulngmin,ulngmax) 
+        = (userlat-RANGE,userlat+RANGE,userlng-RANGE,userlng+RANGE);
 
     let select_store_struct_cql: &str = formatcp!(
         "SELECT 
@@ -73,16 +81,17 @@ pub async fn select_stores(session: &Arc<Session>, userlat: f64,userlng: f64)-> 
 
         WHERE {SHORT_LAT} IN (?,?,?) 
         AND {SHORT_LNG} IN (?,?,?) 
-        AND ({LATITUDE},{LONGITUDE}) > (?,?)
+        AND ({LATITUDE},{LONGITUDE}) > (?,?)    
         AND ({LATITUDE},{LONGITUDE}) < (?,?)
 
         LIMIT 20;");  
 
-    const RANGE:f64 = 0.1_f64;
-
     let mut stores: Vec<StoreResponse> = Vec::new();
-    if let Some(rows) = session.query(select_store_struct_cql,(slat-1,slat,slat+1,slng-1,slng,slng+1,userlat-RANGE,userlng-RANGE,userlat+RANGE,userlng+RANGE)).await?.rows {
-        for row in rows.into_typed::<(uuid::Uuid, String,String,String,String,f64,f64,i8,i8, bool)>() {
+    if let Some(rows) = session.query(
+        select_store_struct_cql,
+        (slatmin,slat,slatmax,slngmin,slng,slngmax,ulatmin,ulngmin,ulatmax,ulngmax))
+        .await?.rows {
+        for row in rows.into_typed::<(uuid::Uuid, String,String,String,String,f64,f64,i16,i16, bool)>() {
             match row {
                 Ok(r) => {
                     let store = StoreResponse{
