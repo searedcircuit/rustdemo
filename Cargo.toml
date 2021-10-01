@@ -6,7 +6,7 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-const_format = "0.2.20"
+const_format = "0.2.21"
 uuid = { version = "0.8.2", features = ["serde", "v4"] }
 chrono = {version="0.4.19",features = ["serde"]}
 tokio = { version = "1.10.1", features = ["full"] }

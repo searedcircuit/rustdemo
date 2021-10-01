@@ -73,6 +73,7 @@ pub const AUTH_REFRESH_CODE_INSERT: &str =
 pub const STORE_KS_NAME: &str = "store_ks";
 
 pub const STORE_INFO_TAB_NAME: &str = "store_info";
+pub const STORE_LOC_MAP_TAB_NAME: &str = "store_loc_map";
 
 pub const STORE_ID: &str = "store_id";
 pub const PLACE_ID: &str = "place_id";
@@ -96,13 +97,26 @@ pub const STORE_INFO_INSERT: &str =
             {FORMATTED_ADDRESS},
             {LATITUDE},
             {LONGITUDE},
-            {SHORT_LAT},            
-            {SHORT_LNG},
             {STORE_IS_ACTIVE},
             {CREATED_DATE},
             {MODIFIED_DATE}
         ) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+
+pub const STORE_LOC_MAP_INSERT: &str = 
+    formatcp!("INSERT INTO 
+        {STORE_KS_NAME}.{STORE_LOC_MAP_TAB_NAME} 
+        (
+            {STORE_ID},
+            {PLACE_ID},
+            {LATITUDE},
+            {LONGITUDE},
+            {SHORT_LAT},            
+            {SHORT_LNG},
+            {CREATED_DATE},
+            {MODIFIED_DATE}
+        ) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)");        
 
 const ADDRESS: &str = "localhost:9042";
 
@@ -147,6 +161,7 @@ pub async fn create_tables(session: &Arc<Session>) -> Result<(),QueryError> {
     create_refresh_code(session).await?;
     
     create_store(session).await?;
+    create_store_loc_map(session).await?;
     
     Ok(())
 }
@@ -274,11 +289,31 @@ async fn create_store(session: &Arc<Session>) -> Result<(), QueryError> {
             {FORMATTED_ADDRESS} text,
             {LATITUDE} double,
             {LONGITUDE} double,
-            {SHORT_LAT} smallint,
-            {SHORT_LNG} smallint,
             {CREATED_DATE} timestamp,
             {MODIFIED_DATE} timestamp,
             {STORE_IS_ACTIVE} boolean,
+            PRIMARY KEY ({STORE_ID})
+        );");
+
+    session
+        .query(create_store_info_table_cql,&[]).await?;
+    
+    Ok(())
+}
+
+async fn create_store_loc_map(session: &Arc<Session>) -> Result<(), QueryError> {
+    let create_store_info_table_cql = 
+        formatcp!(
+        "CREATE TABLE IF NOT EXISTS {STORE_KS_NAME}.{STORE_LOC_MAP_TAB_NAME}
+        (
+            {SHORT_LAT} smallint,
+            {SHORT_LNG} smallint,
+            {STORE_ID} UUID,
+            {PLACE_ID} text,
+            {LATITUDE} double,
+            {LONGITUDE} double,
+            {CREATED_DATE} timestamp,
+            {MODIFIED_DATE} timestamp,
             PRIMARY KEY (({SHORT_LAT}, {SHORT_LNG}), {LATITUDE}, {LONGITUDE})
         ) WITH CLUSTERING ORDER BY ({LATITUDE} ASC, {LONGITUDE} ASC);");
 

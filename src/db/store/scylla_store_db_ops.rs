@@ -2,6 +2,7 @@ use const_format::formatcp;
 use chrono::{Utc,Duration};
 use scylla::transport::errors::QueryError;
 use std::sync::Arc;
+use tokio::try_join;
 
 use scylla::frame::value::Timestamp;
 use scylla::transport::session::{IntoTypedRows, Session};
@@ -9,6 +10,7 @@ use scylla::transport::session::{IntoTypedRows, Session};
 use crate::db::common::{
     STORE_KS_NAME,
     STORE_INFO_TAB_NAME,
+    STORE_LOC_MAP_TAB_NAME,
     STORE_NAME,
     STORE_DESCRIPTION,
     FORMATTED_ADDRESS,
@@ -19,7 +21,8 @@ use crate::db::common::{
     SHORT_LAT,
     SHORT_LNG,
     STORE_IS_ACTIVE,
-    STORE_INFO_INSERT};
+    STORE_INFO_INSERT,
+    STORE_LOC_MAP_INSERT};
 use crate::data::{    
     response::store::get_store_response::StoreResponse,
     request::store::create_store_request::CreateStoreRequest,    
@@ -34,20 +37,36 @@ pub async fn insert_store(session: &Arc<Session>, store: &CreateStoreRequest) ->
     let slat = f64::round(store.lat.unwrap() * 10.0) as i16;
     let slng = f64::round(store.lng.unwrap() * 10.0) as i16;
 
-    session
-        .query(STORE_INFO_INSERT, 
-        (store_id,
-                &store.place_id,
-                &store.name,
-                &store.description,
-                &store.formatted_address,
-                store.lat,
-                store.lng,
-                slat,
-                slng,
-                store.active,
-                Timestamp(created),
-                Timestamp(modified))).await?;
+    let create_store_future = session.query(
+        STORE_INFO_INSERT, 
+        (
+            store_id,
+            &store.place_id,
+            &store.name,
+            &store.description,
+            &store.formatted_address,
+            store.lat,
+            store.lng,
+            store.active,
+            Timestamp(created),
+            Timestamp(modified)
+        ));
+
+    let create_loc_map_future = session.query(
+        STORE_LOC_MAP_INSERT, 
+        (
+            store_id,
+            &store.place_id,
+            store.lat,
+            store.lng,
+            slat,
+            slng,
+            Timestamp(created),
+            Timestamp(modified)
+        ));    
+    
+    try_join!(create_store_future,create_loc_map_future)?;    
+        
     Ok(())
 }
 
@@ -63,6 +82,20 @@ pub async fn select_stores(session: &Arc<Session>, userlat: f64,userlng: f64)-> 
     let (ulatmin,ulatmax,ulngmin,ulngmax) 
         = (userlat-RANGE,userlat+RANGE,userlng-RANGE,userlng+RANGE);
 
+    let select_storeid_struct_cql: &str = formatcp!(
+        "SELECT 
+        
+        {STORE_ID}
+
+        FROM {STORE_KS_NAME}.{STORE_LOC_MAP_TAB_NAME}         
+
+        WHERE {SHORT_LAT} IN (?,?,?) 
+        AND {SHORT_LNG} IN (?,?,?) 
+        AND ({LATITUDE},{LONGITUDE}) > (?,?)    
+        AND ({LATITUDE},{LONGITUDE}) < (?,?)
+
+        LIMIT 20;");   
+
     let select_store_struct_cql: &str = formatcp!(
         "SELECT 
         
@@ -73,25 +106,40 @@ pub async fn select_stores(session: &Arc<Session>, userlat: f64,userlng: f64)-> 
         {FORMATTED_ADDRESS}, 
         {LATITUDE}, 
         {LONGITUDE},
-        {SHORT_LAT},
-        {SHORT_LNG},
         {STORE_IS_ACTIVE} 
 
         FROM {STORE_KS_NAME}.{STORE_INFO_TAB_NAME}         
 
-        WHERE {SHORT_LAT} IN (?,?,?) 
-        AND {SHORT_LNG} IN (?,?,?) 
-        AND ({LATITUDE},{LONGITUDE}) > (?,?)    
-        AND ({LATITUDE},{LONGITUDE}) < (?,?)
+        WHERE {STORE_ID} IN (?)
 
-        LIMIT 20;");  
+        LIMIT 20;");         
+
+    let mut storeids: Vec<String> = Vec::new();
+    if let Some(rows) = session.query(
+        select_storeid_struct_cql,
+        (slatmin,slat,slatmax,slngmin,slng,slngmax,ulatmin,ulngmin,ulatmax,ulngmax))
+        .await?.rows {
+        for row in rows.into_typed::<(uuid::Uuid,)>() {
+            match row {
+                Ok(r) => {
+                    storeids.push(r.0.to_string());
+                }
+                Err(e) => {
+                    // log e
+                    return Err(format!("Error locating storeids. {}",e).into())
+                }
+            };
+        }
+    }
+
+    let storeids_str = storeids.join(",");
+    let select_store_cql_updated = select_store_struct_cql.replace("?", &storeids_str);
 
     let mut stores: Vec<StoreResponse> = Vec::new();
     if let Some(rows) = session.query(
-        select_store_struct_cql,
-        (slatmin,slat,slatmax,slngmin,slng,slngmax,ulatmin,ulngmin,ulatmax,ulngmax))
+        select_store_cql_updated,&[])
         .await?.rows {
-        for row in rows.into_typed::<(uuid::Uuid, String,String,String,String,f64,f64,i16,i16, bool)>() {
+        for row in rows.into_typed::<(uuid::Uuid, String,String,String,String,f64,f64, bool)>() {
             match row {
                 Ok(r) => {
                     let store = StoreResponse{
@@ -102,9 +150,7 @@ pub async fn select_stores(session: &Arc<Session>, userlat: f64,userlng: f64)-> 
                         formatted_address: Some(r.4),
                         lat: Some(r.5),
                         lng: Some(r.6),
-                        slat: Some(r.7),
-                        slng: Some(r.8),
-                        active:r.9
+                        active:r.7
                     };
                     stores.push(store);
                 }

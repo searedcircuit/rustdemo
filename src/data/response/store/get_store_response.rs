@@ -10,8 +10,6 @@ pub struct StoreResponse{
     pub description: Option<String>,    
     pub lat: Option<f64>,
     pub lng: Option<f64>,
-    pub slat: Option<i16>,
-    pub slng: Option<i16>,
     pub active: bool
 }
 
@@ -25,8 +23,6 @@ impl Default for StoreResponse {
             description: None,
             lat: None,
             lng: None,
-            slat: None,
-            slng: None,
             active:false
         }
     } 
