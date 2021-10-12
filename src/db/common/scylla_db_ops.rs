@@ -205,6 +205,7 @@ pub const MENU_OPTION_TAB_NAME:&str = "menu_option";
 
 pub const OPTION_ID: &str = "option_id";
 pub const OPTION_NAME: &str = "option_name";
+pub const OPTION_COST: &str = "option_cost";
 
 pub const MENU_OPTION_INSERT: &str = 
     formatcp!("INSERT INTO 
@@ -214,10 +215,11 @@ pub const MENU_OPTION_INSERT: &str =
             {OPTION_ID},
 
             {OPTION_NAME},   
+            {OPTION_COST},
             {CREATED_DATE},
             {MODIFIED_DATE}
         ) 
-        VALUES (?, ?, ?, ?, ?)");
+        VALUES (?, ?, ?, ?, ?, ?)");
 
 pub const MENU_OPTION_SELECT: &str =
     formatcp!("
@@ -226,6 +228,7 @@ pub const MENU_OPTION_SELECT: &str =
             {OPTION_ID},
 
             {OPTION_NAME},   
+            {OPTION_COST},
             {CREATED_DATE},
             {MODIFIED_DATE}
         FROM
@@ -452,7 +455,8 @@ async fn create_menu_option(session: &Arc<Session>) -> Result<(), QueryError> {
             {STORE_ID} UUID PRIMARY KEY,
             {OPTION_ID} UUID,
 
-            {OPTION_NAME} text,           
+            {OPTION_NAME} text,   
+            {OPTION_COST} int,        
             {CREATED_DATE} timestamp,
             {MODIFIED_DATE} timestamp
         );");

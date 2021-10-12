@@ -1,6 +1,7 @@
 use futures::future::try_join_all;
 use chrono::{Utc,Duration};
 use scylla::transport::errors::QueryError;
+use tokio::try_join;
 use std::sync::Arc;
 
 use scylla::frame::value::Timestamp;
@@ -12,7 +13,10 @@ use crate::db::common::{
     MENU_ITEM_SELECT,
     MENU_OPTION_SELECT};
 use crate::data::{   
-    db::DbMenuItem, 
+    db::{
+        DbMenuItem,
+        DbMenuOption
+    }, 
     request::menu::{
         create_menu_request::CreateMenuRequest,
         create_menu_option_request::CreateOrUpdateMenuOptionRequest
@@ -70,11 +74,18 @@ pub async fn insert_menu_option(session: &Arc<Session>, option: &CreateOrUpdateM
 
 pub async fn select_menu_items(session: &Arc<Session>, store_id: uuid::Uuid)-> Result<MenuResponse,Box<dyn std::error::Error>> {      
     let mut menu: MenuResponse = MenuResponse::default();
-    if let Some(rows) = session.query(
-        MENU_ITEM_SELECT,(store_id,))
-        .await?.rows {
+    menu.store_id = store_id;
+
+    let items_future = session.query(
+        MENU_ITEM_SELECT,(store_id,));
+    let options_future = session.query(
+        MENU_OPTION_SELECT, (store_id,));
+
+    let (items_res,options_res) = try_join!(items_future,options_future)?;
+
+    if let Some(rows) = items_res.rows {
         for row in rows.into_typed::<(uuid::Uuid, uuid::Uuid,String,String,String,String,i32,Duration,Duration)>() {
-            match row {
+            match row {                
                 Ok(r) => {
                     let item = DbMenuItem{           
                         item_id: r.1,
@@ -94,27 +105,17 @@ pub async fn select_menu_items(session: &Arc<Session>, store_id: uuid::Uuid)-> R
             };
         }
     }
-    Ok(menu)
-}
 
-pub async fn select_menu_options(session: &Arc<Session>, store_id: uuid::Uuid)-> Result<MenuResponse,Box<dyn std::error::Error>> {      
-    let mut menu: MenuResponse = MenuResponse::default();
-    if let Some(rows) = session.query(
-        MENU_ITEM_SELECT,(store_id,))
-        .await?.rows {
-        for row in rows.into_typed::<(uuid::Uuid, uuid::Uuid,String,String,String,String,i32,Duration,Duration)>() {
-            match row {
+    if let Some(rows) = options_res.rows {
+        for row in rows.into_typed::<(uuid::Uuid, uuid::Uuid,String,i32,Duration,Duration)>() {
+            match row {                
                 Ok(r) => {
-                    let item = DbMenuItem{           
-                        item_id: r.1,
-
-                        item_name: Some(r.2),
-                        item_desc: Some(r.3),
-                        item_size: Some(r.4),
-                        item_temp: Some(r.5),
-                        item_cost: Some(r.6)
+                    let option = DbMenuOption{
+                        option_id: r.1,
+                        name: Some(r.2),
+                        cost: Some(r.3)
                     };
-                    menu.items.push(item);
+                    menu.options.push(option);
                 }
                 Err(e) => {
                     // log e
@@ -123,5 +124,6 @@ pub async fn select_menu_options(session: &Arc<Session>, store_id: uuid::Uuid)->
             };
         }
     }
+
     Ok(menu)
 }

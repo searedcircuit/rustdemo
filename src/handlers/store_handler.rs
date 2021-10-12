@@ -87,8 +87,8 @@ async fn get_store(pool: web::Data<Arc<Session>>,loc:web::Path<(f64,f64)>) -> Re
     }
 }
 
-#[get("/stores/find/{lat}/{lng}")]
-async fn get(pool: web::Data<Arc<Session>>,loc:web::Path<(f64,f64)>) -> Result<HttpResponse> {
+#[get("/stores/menu/{store_id}")]
+async fn get**menu(pool: web::Data<Arc<Session>>,loc:web::Path<(f64,f64)>) -> Result<HttpResponse> {
     let poolconn = pool.get_ref();
     let (lat,lng) = loc.into_inner();
     let ures = select_stores(&poolconn,lat,lng).await;
