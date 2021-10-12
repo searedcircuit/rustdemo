@@ -1,4 +1,3 @@
-use const_format::formatcp;
 use chrono::{Utc,Duration};
 use scylla::transport::errors::QueryError;
 use std::sync::Arc;
@@ -8,21 +7,10 @@ use scylla::frame::value::Timestamp;
 use scylla::transport::session::{IntoTypedRows, Session};
 
 use crate::db::common::{
-    STORE_KS_NAME,
-    STORE_INFO_TAB_NAME,
-    STORE_LOC_MAP_TAB_NAME,
-    STORE_NAME,
-    STORE_DESCRIPTION,
-    FORMATTED_ADDRESS,
-    STORE_ID,
-    PLACE_ID,
-    LATITUDE,
-    LONGITUDE,
-    SHORT_LAT,
-    SHORT_LNG,
-    STORE_IS_ACTIVE,
     STORE_INFO_INSERT,
-    STORE_LOC_MAP_INSERT};
+    STORE_LOC_MAP_INSERT,
+    STORE_INFO_SELECT,
+    STORE_LOC_MAP_SELECT};
 use crate::data::{    
     response::store::get_store_response::StoreResponse,
     request::store::create_store_request::CreateStoreRequest,    
@@ -80,43 +68,11 @@ pub async fn select_stores(session: &Arc<Session>, userlat: f64,userlng: f64)-> 
     let slatmax = f64::round((userlat+RANGE) * 10.0) as i16;
     let slngmax = f64::round((userlng+RANGE) * 10.0) as i16;
     let (ulatmin,ulatmax,ulngmin,ulngmax) 
-        = (userlat-RANGE,userlat+RANGE,userlng-RANGE,userlng+RANGE);
-
-    let select_storeid_struct_cql: &str = formatcp!(
-        "SELECT 
-        
-        {STORE_ID}
-
-        FROM {STORE_KS_NAME}.{STORE_LOC_MAP_TAB_NAME}         
-
-        WHERE {SHORT_LAT} IN (?,?,?) 
-        AND {SHORT_LNG} IN (?,?,?) 
-        AND ({LATITUDE},{LONGITUDE}) > (?,?)    
-        AND ({LATITUDE},{LONGITUDE}) < (?,?)
-
-        LIMIT 20;");   
-
-    let select_store_struct_cql: &str = formatcp!(
-        "SELECT 
-        
-        {STORE_ID}, 
-        {PLACE_ID}, 
-        {STORE_NAME}, 
-        {STORE_DESCRIPTION}, 
-        {FORMATTED_ADDRESS}, 
-        {LATITUDE}, 
-        {LONGITUDE},
-        {STORE_IS_ACTIVE} 
-
-        FROM {STORE_KS_NAME}.{STORE_INFO_TAB_NAME}         
-
-        WHERE {STORE_ID} IN (?)
-
-        LIMIT 20;");         
+        = (userlat-RANGE,userlat+RANGE,userlng-RANGE,userlng+RANGE);        
 
     let mut storeids: Vec<String> = Vec::new();
     if let Some(rows) = session.query(
-        select_storeid_struct_cql,
+        STORE_LOC_MAP_SELECT,
         (slatmin,slat,slatmax,slngmin,slng,slngmax,ulatmin,ulngmin,ulatmax,ulngmax))
         .await?.rows {
         for row in rows.into_typed::<(uuid::Uuid,)>() {
@@ -133,7 +89,7 @@ pub async fn select_stores(session: &Arc<Session>, userlat: f64,userlng: f64)-> 
     }
 
     let storeids_str = storeids.join(",");
-    let select_store_cql_updated = select_store_struct_cql.replace("?", &storeids_str);
+    let select_store_cql_updated = STORE_INFO_SELECT.replace("?", &storeids_str);
 
     let mut stores: Vec<StoreResponse> = Vec::new();
     if let Some(rows) = session.query(

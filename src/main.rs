@@ -6,7 +6,12 @@ pub mod auth{
 pub mod data{
     pub mod db{
         mod db_user_info;
+        mod db_menu_item;
+        mod db_menu_option;
+        
         pub use db_user_info::DbUserInfo;
+        pub use db_menu_item::DbMenuItem;
+        pub use db_menu_option::DbMenuOption;
     }
     pub mod request{
         pub mod auth{
@@ -16,6 +21,12 @@ pub mod data{
         pub mod store{
             pub mod create_store_request;
             pub use create_store_request::CreateStoreRequest;
+        }
+        pub mod menu{
+            pub mod create_menu_request;
+            pub mod create_menu_option_request;
+            pub use create_menu_request::CreateMenuRequest;
+            pub use create_menu_option_request::CreateOrUpdateMenuOptionRequest;
         }
         pub mod user{
             pub mod create_user_request;
@@ -33,6 +44,10 @@ pub mod data{
         pub mod store{
             pub mod get_store_response;
             pub use get_store_response::StoreResponse;
+        }
+        pub mod menu{
+            pub mod get_menu_response;
+            pub use get_menu_response::MenuResponse;
         }
     }
 }
@@ -57,7 +72,13 @@ pub mod db{
     pub mod store{
         mod scylla_store_db_ops;
         pub use scylla_store_db_ops::{insert_store,select_stores};
-
+    }
+    pub mod menu{
+        mod scylla_menu_db_ops;
+        pub use scylla_menu_db_ops::{
+            insert_menu_item,
+            insert_menu_option
+        };
     }
 }
 pub mod handlers{
@@ -67,7 +88,7 @@ pub mod handlers{
 
     pub use user_handler::{create as user_create,get as user_get,login as user_login};   
     pub use activation_handler::{activate as activate_user};  
-    pub use store_handler::{create as store_create,get as store_get};   
+    pub use store_handler::{create_store,get_store};   
 }
 
 #[actix_web::main]
@@ -81,11 +102,11 @@ async fn main() -> std::io::Result<()> {
             let _srv = HttpServer::new(move|| App::new()
                .service(handlers::user_create).app_data(web::Data::new(pool.clone()))
                .service(handlers::activate_user).app_data(web::Data::new(pool.clone()))
-               .service(handlers::store_create).app_data(web::Data::new(pool.clone()))
+               .service(handlers::create_store).app_data(web::Data::new(pool.clone()))
                
                .service(handlers::user_get).app_data(web::Data::new(pool.clone()))
                .service(handlers::user_login).app_data(web::Data::new(pool.clone()))
-               .service(handlers::store_get).app_data(web::Data::new(pool.clone()))
+               .service(handlers::get_store).app_data(web::Data::new(pool.clone()))
             )
             .bind("0.0.0.0:8081")?
             .run()
