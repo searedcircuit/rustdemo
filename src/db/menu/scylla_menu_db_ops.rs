@@ -61,6 +61,7 @@ pub async fn insert_menu_option(session: &Arc<Session>, option: &CreateOrUpdateM
                 option.store_id,
                 opt_id,
                 &opt.name,
+                &opt.cost,
                 Timestamp(created),
                 Timestamp(modified)
             )); 
@@ -72,7 +73,7 @@ pub async fn insert_menu_option(session: &Arc<Session>, option: &CreateOrUpdateM
     Ok(())
 }
 
-pub async fn select_menu_items(session: &Arc<Session>, store_id: uuid::Uuid)-> Result<MenuResponse,Box<dyn std::error::Error>> {      
+pub async fn select_menu(session: &Arc<Session>, store_id: uuid::Uuid)-> Result<MenuResponse,Box<dyn std::error::Error>> {      
     let mut menu: MenuResponse = MenuResponse::default();
     menu.store_id = store_id;
 
@@ -111,6 +112,7 @@ pub async fn select_menu_items(session: &Arc<Session>, store_id: uuid::Uuid)-> R
             match row {                
                 Ok(r) => {
                     let option = DbMenuOption{
+                        
                         option_id: r.1,
                         name: Some(r.2),
                         cost: Some(r.3)

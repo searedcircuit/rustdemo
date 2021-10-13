@@ -77,7 +77,8 @@ pub mod db{
         mod scylla_menu_db_ops;
         pub use scylla_menu_db_ops::{
             insert_menu_item,
-            insert_menu_option
+            insert_menu_option,
+            select_menu
         };
     }
 }
@@ -88,7 +89,13 @@ pub mod handlers{
 
     pub use user_handler::{create as user_create,get as user_get,login as user_login};   
     pub use activation_handler::{activate as activate_user};  
-    pub use store_handler::{create_store,get_store};   
+    pub use store_handler::{
+        create_store,
+        create_menu_item,
+        create_menu_option,
+        get_store,
+        get_menu
+    };
 }
 
 #[actix_web::main]
@@ -103,10 +110,13 @@ async fn main() -> std::io::Result<()> {
                .service(handlers::user_create).app_data(web::Data::new(pool.clone()))
                .service(handlers::activate_user).app_data(web::Data::new(pool.clone()))
                .service(handlers::create_store).app_data(web::Data::new(pool.clone()))
+               .service(handlers::create_menu_item).app_data(web::Data::new(pool.clone()))
+               .service(handlers::create_menu_option).app_data(web::Data::new(pool.clone()))
                
                .service(handlers::user_get).app_data(web::Data::new(pool.clone()))
                .service(handlers::user_login).app_data(web::Data::new(pool.clone()))
                .service(handlers::get_store).app_data(web::Data::new(pool.clone()))
+               .service(handlers::get_menu).app_data(web::Data::new(pool.clone()))
             )
             .bind("0.0.0.0:8081")?
             .run()

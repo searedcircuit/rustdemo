@@ -430,7 +430,7 @@ async fn create_menu_item(session: &Arc<Session>) -> Result<(), QueryError> {
         formatcp!(
         "CREATE TABLE IF NOT EXISTS {STORE_KS_NAME}.{MENU_ITEM_TAB_NAME}
         (
-            {STORE_ID} UUID PRIMARY KEY,
+            {STORE_ID} UUID,
             {ITEM_ID} UUID,
             {ITEM_NAME} text,
             {ITEM_DESC} text,
@@ -438,8 +438,9 @@ async fn create_menu_item(session: &Arc<Session>) -> Result<(), QueryError> {
             {ITEM_TEMP} text,
             {ITEM_COST} int,            
             {CREATED_DATE} timestamp,
-            {MODIFIED_DATE} timestamp
-        );");
+            {MODIFIED_DATE} timestamp,
+            PRIMARY KEY (({STORE_ID}),{ITEM_ID})
+        ) WITH CLUSTERING ORDER BY ({ITEM_ID} ASC);");
 
     session
         .query(create_menu_item_table_cql,&[]).await?;
@@ -452,14 +453,15 @@ async fn create_menu_option(session: &Arc<Session>) -> Result<(), QueryError> {
         formatcp!(
         "CREATE TABLE IF NOT EXISTS {STORE_KS_NAME}.{MENU_OPTION_TAB_NAME}
         (
-            {STORE_ID} UUID PRIMARY KEY,
+            {STORE_ID} UUID,
             {OPTION_ID} UUID,
 
             {OPTION_NAME} text,   
             {OPTION_COST} int,        
             {CREATED_DATE} timestamp,
-            {MODIFIED_DATE} timestamp
-        );");
+            {MODIFIED_DATE} timestamp,
+            PRIMARY KEY (({STORE_ID}),{OPTION_ID})
+        ) WITH CLUSTERING ORDER BY ({OPTION_ID} ASC);");
 
     session
         .query(create_menu_option_table_cql,&[]).await?;

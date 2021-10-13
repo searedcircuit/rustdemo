@@ -18,7 +18,8 @@ use crate::{
         },
         menu::{
             insert_menu_item,
-            insert_menu_option
+            insert_menu_option,
+            select_menu
         }
     },
     
@@ -88,10 +89,10 @@ async fn get_store(pool: web::Data<Arc<Session>>,loc:web::Path<(f64,f64)>) -> Re
 }
 
 #[get("/stores/menu/{store_id}")]
-async fn get**menu(pool: web::Data<Arc<Session>>,loc:web::Path<(f64,f64)>) -> Result<HttpResponse> {
+async fn get_menu(pool: web::Data<Arc<Session>>,store_id_path:web::Path<uuid::Uuid>) -> Result<HttpResponse> {
     let poolconn = pool.get_ref();
-    let (lat,lng) = loc.into_inner();
-    let ures = select_stores(&poolconn,lat,lng).await;
+    let store_id = store_id_path.into_inner();
+    let ures = select_menu(&poolconn,store_id).await;
     match ures {
         Ok(uinf) =>
             Ok(HttpResponse::Ok().json(uinf)),
