@@ -37,8 +37,8 @@ pub async fn insert_menu_item(session: &Arc<Session>, item: &CreateMenuRequest) 
             item_id,
             &item.name,
             &item.desc,
-            &item.size,
-            &item.temp,
+            &item.size.iter().map(|x| x.to_string()).collect::<Vec<_>>().join(","),
+            &item.temp.iter().map(|x| x.to_string()).collect::<Vec<_>>().join(","),
             &item.cost,
             Timestamp(created),
             Timestamp(modified)
@@ -93,8 +93,8 @@ pub async fn select_menu(session: &Arc<Session>, store_id: uuid::Uuid)-> Result<
 
                         item_name: Some(r.2),
                         item_desc: Some(r.3),
-                        item_size: Some(r.4),
-                        item_temp: Some(r.5),
+                        item_size: r.4.split(",").map(|s| s.to_string()).collect(),
+                        item_temp: r.5.split(",").map(|s| s.to_string()).collect(),
                         item_cost: Some(r.6)
                     };
                     menu.items.push(item);
