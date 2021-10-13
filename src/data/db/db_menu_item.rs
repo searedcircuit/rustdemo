@@ -6,8 +6,8 @@ pub struct DbMenuItem{
 
     pub item_name: Option<String>,
     pub item_desc: Option<String>,
-    pub item_size: Option<String>,
-    pub item_temp: Option<String>,
+    pub item_size: Vec<String>,
+    pub item_temp: Vec<String>,
     pub item_cost: Option<i32>
 }
 
@@ -18,8 +18,8 @@ impl Default for DbMenuItem {
 
             item_name: None,
             item_desc: None,
-            item_size: None,
-            item_temp: None,
+            item_size: Vec::new(),
+            item_temp: Vec::new(),
             item_cost: None
         }
     } 
